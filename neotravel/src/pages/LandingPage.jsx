@@ -1,26 +1,29 @@
+import { Link } from "react-router-dom";
+import "../App.css";
+
 const benefits = [
   {
-    iconClass: 'icon-assistant',
-    title: 'Assistant IA',
-    text: 'Un agent conversationnel intelligent qui vous guide pas à pas pour ne rien oublier dans votre demande de transport.',
+    iconClass: "icon-assistant",
+    title: "Assistant IA",
+    text: "Un agent conversationnel intelligent qui vous guide pas à pas pour ne rien oublier dans votre demande de transport.",
   },
   {
-    iconClass: 'icon-quote',
-    title: 'Devis instantané',
-    text: 'Recevez une estimation chiffrée en temps réel basée sur nos algorithmes de calcul dynamique et règles métier.',
+    iconClass: "icon-quote",
+    title: "Devis instantané",
+    text: "Recevez une estimation chiffrée en temps réel basée sur nos algorithmes de calcul dynamique et règles métier.",
   },
   {
-    iconClass: 'icon-tracking',
-    title: 'Suivi intelligent',
-    text: 'Gérez toutes vos demandes et devis depuis un espace centralisé, avec des notifications pour chaque étape.',
+    iconClass: "icon-tracking",
+    title: "Suivi intelligent",
+    text: "Gérez toutes vos demandes et devis depuis un espace centralisé, avec des notifications pour chaque étape.",
   },
 ];
 
 const checks = [
-  'Analyse sémantique des trajets',
-  'Calcul automatique des temps de conduite',
-  'Ajustement saisonnier des tarifs',
-  'Vérification de disponibilité en temps réel',
+  "Analyse sémantique des trajets",
+  "Calcul automatique des temps de conduite",
+  "Ajustement saisonnier des tarifs",
+  "Vérification de disponibilité en temps réel",
 ];
 
 function LandingPage() {
@@ -40,23 +43,23 @@ function LandingPage() {
 
         <div className="header-actions">
           <a href="#platform">Découvrir la plateforme</a>
-          <a className="button button-dark button-small" href="#quote">
+          <Link className="button button-dark button-small" to="/assistant">
             Demander un devis
-          </a>
+          </Link>
         </div>
       </header>
 
       <main id="top">
         <section className="hero-section" id="discover">
           <p className="eyebrow">La révolution du transport de groupe</p>
-          <h1>Obtenez votre devis de transport de groupe grâce à l'IA</h1>
+          <h1>Obtenez votre devis de transport de groupe grâce à l&apos;IA</h1>
           <p className="hero-copy">
             Fini les attentes interminables au téléphone. Notre assistant intelligent analyse vos besoins instantanément
             pour vous proposer le meilleur tarif en quelques clics.
           </p>
-          <a className="button button-dark hero-button" href="#quote">
+          <Link className="button button-dark hero-button" to="/assistant">
             Demander un devis <span aria-hidden="true">→</span>
-          </a>
+          </Link>
 
           <div className="trusted-by" aria-label="Entreprises utilisatrices">
             <span>Utilisé par :</span>
@@ -70,8 +73,8 @@ function LandingPage() {
           <div className="section-heading">
             <h2>Pourquoi choisir NeoTravel ?</h2>
             <p>
-              Nous avons repensé l'expérience de location d'autocar pour la rendre plus fluide, transparente et efficace
-              pour les organisateurs de voyages.
+              Nous avons repensé l&apos;expérience de location d&apos;autocar pour la rendre plus fluide, transparente
+              et efficace pour les organisateurs de voyages.
             </p>
           </div>
 
@@ -89,10 +92,10 @@ function LandingPage() {
         <section className="assistant-section" id="platform">
           <div className="assistant-copy">
             <span className="tag">Démonstration</span>
-            <h2>L'intelligence au service de vos déplacements</h2>
+            <h2>L&apos;intelligence au service de vos déplacements</h2>
             <p>
-              L'assistant NeoTravel ne se contente pas de prendre votre commande. Il optimise votre itinéraire, suggère
-              la capacité de véhicule idéale et anticipe les besoins logistiques spécifiques aux groupes.
+              L&apos;assistant NeoTravel ne se contente pas de prendre votre commande. Il optimise votre itinéraire,
+              suggère la capacité de véhicule idéale et anticipe les besoins logistiques spécifiques aux groupes.
             </p>
 
             <ul className="check-list">
@@ -101,9 +104,9 @@ function LandingPage() {
               ))}
             </ul>
 
-            <a className="text-link" href="#quote">
-              Essayer l'assistant maintenant <span aria-hidden="true">→</span>
-            </a>
+            <Link className="text-link" to="/assistant">
+              Essayer l&apos;assistant maintenant <span aria-hidden="true">→</span>
+            </Link>
           </div>
 
           <div className="chat-card" aria-label="Simulation assistant NeoTravel IA">
@@ -116,16 +119,16 @@ function LandingPage() {
             </div>
             <div className="chat-messages">
               <p className="message message-bot">
-                Bonjour ! Je suis l'assistant NeoTravel. Je vais vous aider à obtenir un devis précis pour votre voyage
-                de groupe en moins de 2 minutes. Prêt à commencer ?
+                Bonjour ! Je suis l&apos;assistant NeoTravel. Je vais vous aider à obtenir un devis précis pour votre
+                voyage de groupe en moins de 2 minutes. Prêt à commencer ?
               </p>
               <p className="message message-user">
                 Bonjour, oui ! Nous sommes un groupe de 45 personnes pour un trajet Paris-Lyon.
               </p>
               <p className="message message-bot">
-                Parfait. C'est noté pour 45 passagers. Pour quelle date prévoyez-vous ce déplacement ?
+                Parfait. C&apos;est noté pour 45 passagers. Pour quelle date prévoyez-vous ce déplacement ?
               </p>
-              <small>L'IA est en train d'écrire...</small>
+              <small>L&apos;IA est en train d&apos;écrire...</small>
             </div>
             <div className="chat-input">
               <span>Typez votre réponse...</span>
@@ -137,16 +140,16 @@ function LandingPage() {
         <section className="cta-section" id="quote">
           <h2>Prêt à simplifier vos réservations ?</h2>
           <p>
-            Rejoignez des centaines d'entreprises et d'associations qui font confiance à NeoTravel pour leurs
+            Rejoignez des centaines d&apos;entreprises et d&apos;associations qui font confiance à NeoTravel pour leurs
             déplacements de groupe.
           </p>
           <div className="cta-actions">
-            <a className="button button-light" href="#platform">
-              Lancer l'assistant IA
-            </a>
-            <a className="button button-outline" href="#professional">
+            <Link className="button button-light" to="/assistant">
+              Lancer l&apos;assistant IA
+            </Link>
+            <Link className="button button-outline" to="/dashboard">
               Accès Professionnel
-            </a>
+            </Link>
           </div>
         </section>
       </main>
@@ -164,8 +167,8 @@ function LandingPage() {
           <div>
             <h3>Produit</h3>
             <a href="#features">Fonctionnalités</a>
-            <a href="#platform">Assistant IA</a>
-            <a href="#pricing">Calculateur</a>
+            <Link to="/assistant">Assistant IA</Link>
+            <Link to="/devis">Calculateur</Link>
           </div>
           <div>
             <h3>Société</h3>
@@ -180,7 +183,7 @@ function LandingPage() {
           </div>
         </div>
 
-        <p className="copyright">© 2024 NeoTravel. Propulsé par l'IA.</p>
+        <p className="copyright">© 2024 NeoTravel. Propulsé par l&apos;IA.</p>
       </footer>
     </div>
   );
