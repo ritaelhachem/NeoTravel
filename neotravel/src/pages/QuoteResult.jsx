@@ -1,23 +1,98 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import "../App.css";
 
-const quoteDetails = [
-  { label: "Départ", value: "Paris, Gare de Lyon", icon: "pin" },
-  { label: "Destination", value: "Lyon, Place Bellecour", icon: "map" },
-  { label: "Date & heure", value: "15 Juillet 2024 à 08:30", icon: "cal" },
-  { label: "Passagers", value: "48 Personnes", icon: "grp" },
-];
+function formatCurrency(value, currency = "EUR") {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency,
+  }).format(Number(value || 0));
+}
 
-const calculationRows = [
-  { title: "Distance Totale", subtitle: "465 km à 1.85€/km", value: "860,25 €" },
-  { title: "Type de Trajet", subtitle: "Aller simple", value: "Inclus" },
-  { title: "Coefficient Saison", subtitle: "Haute saison (Juillet)", value: "+ 15%", danger: true },
-  { title: "Coefficient Urgence", subtitle: "Réservation > 30 jours", value: "0%" },
-  { title: "Capacité & Logistique", subtitle: "Optimisation 50 places", value: "- 5%" },
-  { title: "Marge Commerciale", subtitle: "Frais de service NeoTravel", value: "85,00 €", danger: true },
-];
+function normalizeQuote(state) {
+  const rawQuote = state?.devis?.details || state?.devis || null;
+
+  if (!rawQuote) {
+    return null;
+  }
+
+  return {
+    id: state?.record?.id || state?.devis?.id || rawQuote.id,
+    departure: rawQuote.departure || "Non renseigné",
+    destination: rawQuote.destination || "Non renseigné",
+    passengers: rawQuote.passengers || 1,
+    date: rawQuote.date || rawQuote.travel_date || "Non renseignée",
+    tripType: rawQuote.tripType || rawQuote.trip_type || "Aller simple",
+    distanceKm: rawQuote.distanceKm || rawQuote.distance_km || 120,
+    estimatedPrice: rawQuote.estimatedPrice || rawQuote.estimated_price || 0,
+    currency: rawQuote.currency || "EUR",
+    breakdown: rawQuote.breakdown || {},
+    saved: Boolean(state?.saved),
+  };
+}
 
 function QuoteResult() {
+  const { state } = useLocation();
+  const quote = normalizeQuote(state);
+
+  if (!quote) {
+    return (
+      <div className="quote-page">
+        <header className="quote-header">
+          <Link className="brand" to="/" aria-label="NeoTravel accueil">
+            <span className="brand-icon">bus</span>
+            <span>NeoTravel</span>
+          </Link>
+        </header>
+
+        <main className="quote-shell">
+          <article className="quote-card missing-quote-card">
+            <h1>Aucun devis à afficher</h1>
+            <p>Revenez à l'assistant pour générer un devis à partir de vos informations de trajet.</p>
+            <Link className="button button-dark" to="/assistant">Créer un devis</Link>
+          </article>
+        </main>
+      </div>
+    );
+  }
+
+  const quoteDetails = [
+    { label: "Départ", value: quote.departure, icon: "pin" },
+    { label: "Destination", value: quote.destination, icon: "map" },
+    { label: "Date", value: quote.date, icon: "cal" },
+    { label: "Passagers", value: `${quote.passengers} personne${Number(quote.passengers) > 1 ? "s" : ""}`, icon: "grp" },
+  ];
+
+  const calculationRows = [
+    {
+      title: "Distance totale",
+      subtitle: `${quote.distanceKm} km à ${formatCurrency(quote.breakdown.pricePerKm, quote.currency)}/km`,
+      value: formatCurrency(Number(quote.distanceKm) * Number(quote.breakdown.pricePerKm || 0), quote.currency),
+    },
+    {
+      title: "Passagers",
+      subtitle: `${quote.passengers} x ${formatCurrency(quote.breakdown.pricePerPassenger, quote.currency)}`,
+      value: formatCurrency(Number(quote.passengers) * Number(quote.breakdown.pricePerPassenger || 0), quote.currency),
+    },
+    {
+      title: "Type de trajet",
+      subtitle: quote.tripType,
+      value: quote.breakdown.roundTripMultiplier > 1 ? `x ${quote.breakdown.roundTripMultiplier}` : "Inclus",
+    },
+    {
+      title: "Forfait de base",
+      subtitle: "Prise en charge et préparation",
+      value: formatCurrency(quote.breakdown.basePrice, quote.currency),
+    },
+  ];
+
+  const reference = quote.id ? `#NT-${String(quote.id).slice(0, 8).toUpperCase()}` : "#NT-PROVISOIRE";
+  const generatedDate = new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+  const vat = Math.round((Number(quote.estimatedPrice) / 1.1) * 0.1);
+
   return (
     <div className="quote-page">
       <header className="quote-header">
@@ -43,7 +118,7 @@ function QuoteResult() {
             </Link>
             <h1>Votre devis est prêt</h1>
           </div>
-          <span className="quote-generated">Généré le 15 Juin 2024 · ID: 88291-A</span>
+          <span className="quote-generated">Généré le {generatedDate} · {reference}</span>
         </div>
 
         <div className="quote-layout">
@@ -70,12 +145,12 @@ function QuoteResult() {
                 <div>
                   <em>Type de prestation</em>
                   <h2>Autocar Grand Tourisme</h2>
-                  <p>Incluant chauffeur, carburant et assurances obligatoires.</p>
+                  <p>{quote.tripType}. Incluant chauffeur, carburant et assurances obligatoires.</p>
                 </div>
                 <div className="price-box">
                   <span>Prix estimé TTC</span>
-                  <strong>1 245,00 €</strong>
-                  <small>TVA 10% incluse (113,18 €)</small>
+                  <strong>{formatCurrency(quote.estimatedPrice, quote.currency)}</strong>
+                  <small>TVA 10% incluse ({formatCurrency(vat, quote.currency)})</small>
                 </div>
               </div>
             </article>
@@ -102,7 +177,7 @@ function QuoteResult() {
                 <p>Les prix peuvent varier selon la disponibilité réelle des transporteurs au moment de la validation.</p>
                 <div>
                   <span>Total final</span>
-                  <strong>1 245,00 €</strong>
+                  <strong>{formatCurrency(quote.estimatedPrice, quote.currency)}</strong>
                 </div>
               </div>
             </article>
@@ -134,11 +209,11 @@ function QuoteResult() {
               <dl>
                 <div>
                   <dt>Référence</dt>
-                  <dd>#NT-2024-089</dd>
+                  <dd>{reference}</dd>
                 </div>
                 <div>
-                  <dt>Validité</dt>
-                  <dd>7 jours (22/06/2024)</dd>
+                  <dt>Statut</dt>
+                  <dd>{quote.saved ? "Sauvegardé" : "Provisoire"}</dd>
                 </div>
               </dl>
             </article>

@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import "../App.css";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 const steps = [
   {
     key: "departure",
@@ -65,6 +67,8 @@ function AssistantIA() {
   });
   const [currentStep, setCurrentStep] = useState(0);
   const [inputValue, setInputValue] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
 
   const isComplete = useMemo(
     () => steps.every((step) => String(answers[step.key]).trim().length > 0),
@@ -105,9 +109,36 @@ function AssistantIA() {
     setInputValue("");
   };
 
-  const handleGenerateQuote = () => {
-    if (isComplete) {
-      navigate("/devis");
+  const handleGenerateQuote = async () => {
+    if (!isComplete || isGenerating) {
+      return;
+    }
+
+    setIsGenerating(true);
+    setQuoteError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/devis`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(answers),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Impossible de générer le devis.");
+      }
+
+      navigate("/devis", {
+        state: result,
+      });
+    } catch (error) {
+      setQuoteError(error.message || "Impossible de générer le devis.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -194,9 +225,11 @@ function AssistantIA() {
 
           <div className={`completion-note ${isComplete ? "ready" : ""}`}>{progressLabel}</div>
 
-          <button className="generate-quote-button" disabled={!isComplete} onClick={handleGenerateQuote} type="button">
-            Générer mon devis <span aria-hidden="true">→</span>
+          <button className="generate-quote-button" disabled={!isComplete || isGenerating} onClick={handleGenerateQuote} type="button">
+            {isGenerating ? "Génération en cours..." : "Générer mon devis"} <span aria-hidden="true">→</span>
           </button>
+
+          {quoteError && <p className="quote-error" role="alert">{quoteError}</p>}
 
           <p className="quote-terms">
             En générant ce devis, vous acceptez nos conditions générales d&apos;utilisation et de service.
