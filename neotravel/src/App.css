@@ -784,6 +784,30 @@ a {
   opacity: 0.45;
 }
 
+.trip-choice-group {
+  display: grid;
+  flex: 1;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.assistant-input-shell .trip-choice-group button {
+  background: #f5f7fb;
+  border: 1px solid #d7dde7;
+  border-radius: 999px;
+  color: #20242c;
+  font-size: 15px;
+  font-weight: 900;
+  height: 48px;
+  width: 100%;
+}
+
+.assistant-input-shell .trip-choice-group button:hover {
+  background: #111111;
+  border-color: #111111;
+  color: #ffffff;
+}
+
 .assistant-input-area small {
   color: #667085;
   display: block;
@@ -1375,6 +1399,32 @@ a {
   width: 100%;
 }
 
+.action-card button:disabled {
+  color: #a6adba;
+  cursor: wait;
+}
+
+.quote-action-status {
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+}
+
+.quote-action-status.success {
+  background: #eef8f2;
+  border: 1px solid #8ed8aa;
+  color: #247b45;
+}
+
+.quote-action-status.error {
+  background: #fff1f1;
+  border: 1px solid #ffc6c6;
+  color: #b42318;
+}
+
 .dark-action,
 .action-card .dark-action {
   background: var(--dark);
@@ -1758,8 +1808,24 @@ a {
   margin-top: 8px;
 }
 
+.dashboard-alert {
+  background: #f8f9fb;
+  border-top: 1px solid #dfe3ea;
+  color: #596171;
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  padding: 22px 30px;
+}
+
+.dashboard-alert.error {
+  background: #fff5f5;
+  color: #b42318;
+}
+
 .status-envoye,
-.status-brouillon {
+.status-brouillon,
+.status-en-validation {
   background: #f1f2f4;
   border-color: #f1f2f4;
 }

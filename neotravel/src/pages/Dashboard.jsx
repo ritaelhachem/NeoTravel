@@ -1,62 +1,100 @@
 import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import "../App.css";
 
-const stats = [
-  { label: "Nombre de leads", value: "1,284", trend: "+12%", color: "blue" },
-  { label: "Devis envoyés", value: "856", trend: "+5%", color: "green" },
-  { label: "Demandes en attente", value: "42", trend: "-2%", color: "orange" },
-  { label: "Validation humaine", value: "12", trend: "", color: "red" },
-];
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-const requests = [
-  {
-    client: "Association Sportive Lyon",
-    ref: "NT-2024-001",
-    trip: "Lyon → Paris (Aller-Retour)",
-    passengers: 52,
-    price: "1 240,00 €",
-    status: "En attente",
-    priority: "Normale",
-  },
-  {
-    client: "École Primaire Jules Ferry",
-    ref: "NT-2024-002",
-    trip: "Bordeaux → Arcachon",
-    passengers: 45,
-    price: "890,00 €",
-    status: "Envoyé",
-    priority: "Urgente",
-  },
-  {
-    client: "BTP Solutions France",
-    ref: "NT-2024-003",
-    trip: "Nantes → Rennes",
-    passengers: 12,
-    price: "450,00 €",
-    status: "Brouillon",
-    priority: "Validation humaine",
-  },
-  {
-    client: "Club des Seniors Marseille",
-    ref: "NT-2024-004",
-    trip: "Marseille → Nice",
-    passengers: 30,
-    price: "720,00 €",
-    status: "En attente",
-    priority: "Normale",
-  },
-  {
-    client: "Agence Voyage Prestige",
-    ref: "NT-2024-005",
-    trip: "Paris → Chamonix",
-    passengers: 18,
-    price: "2 100,00 €",
-    status: "Validé",
-    priority: "Urgente",
-  },
-];
+function formatCurrency(value) {
+  if (value === null || value === undefined) {
+    return "Sur devis";
+  }
+
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0)) + " €";
+}
+
+function normalizeStatus(status) {
+  return String(status || "brouillon")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-");
+}
+
+function buildRows(devis = []) {
+  return devis.map((item) => {
+    const client = item.clients || {};
+    const tripType = client.type_trajet === "aller-retour" ? "Aller-retour" : "Aller simple";
+
+    return {
+      id: item.id,
+      client: client.nom || "Client inconnu",
+      ref: item.id ? `NT-${String(item.id).slice(0, 8).toUpperCase()}` : "NT-PROVISOIRE",
+      trip: `${client.ville_depart || "Départ"} → ${client.ville_arrivee || "Arrivée"} (${tripType})`,
+      passengers: client.nombre_passagers || "-",
+      price: formatCurrency(item.prix),
+      status: item.statut || "Brouillon",
+      priority: item.statut === "En validation" ? "Validation humaine" : "Normale",
+      createdAt: item.date_creation,
+    };
+  });
+}
 
 function Dashboard() {
+  const [devis, setDevis] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDevis() {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const response = await fetch(`${API_BASE_URL}/api/devis`);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Impossible de charger les devis.");
+        }
+
+        if (isMounted) {
+          setDevis(result.devis || []);
+        }
+      } catch (loadError) {
+        if (isMounted) {
+          setError(loadError.message || "Impossible de charger les devis.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadDevis();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const rows = useMemo(() => buildRows(devis), [devis]);
+  const validationCount = rows.filter((row) => row.priority === "Validation humaine").length;
+  const sentCount = rows.filter((row) => row.status === "Envoyé").length;
+  const pendingCount = rows.filter((row) => row.status === "En validation" || row.status === "Brouillon").length;
+
+  const stats = [
+    { label: "Nombre de leads", value: rows.length, trend: "", color: "blue" },
+    { label: "Devis envoyés", value: sentCount, trend: "", color: "green" },
+    { label: "Demandes en attente", value: pendingCount, trend: "", color: "orange" },
+    { label: "Validation humaine", value: validationCount, trend: "", color: "red" },
+  ];
+
   return (
     <div className="dashboard-page">
       <aside className="dashboard-sidebar">
@@ -97,7 +135,7 @@ function Dashboard() {
             </div>
             <div className="dashboard-actions">
               <button type="button">Derniers 30 jours</button>
-              <button className="dark-action" type="button">Nouvelle demande</button>
+              <Link className="dark-action" to="/assistant">Nouvelle demande</Link>
             </div>
           </div>
 
@@ -123,55 +161,64 @@ function Dashboard() {
               </div>
             </div>
 
-            <div className="requests-table-wrap">
-              <table className="requests-table">
-                <thead>
-                  <tr>
-                    <th>Nom du client</th>
-                    <th>Trajet</th>
-                    <th>Passagers</th>
-                    <th>Prix</th>
-                    <th>Statut</th>
-                    <th>Priorité</th>
-                    <th aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((request) => (
-                    <tr key={request.ref}>
-                      <td>
-                        <strong>{request.client}</strong>
-                        <small>{request.ref}</small>
-                      </td>
-                      <td>{request.trip}</td>
-                      <td>{request.passengers}</td>
-                      <td>
-                        <b>{request.price}</b>
-                      </td>
-                      <td>
-                        <span className={`status-pill status-${request.status.toLowerCase().replace("é", "e").replace(" ", "-")}`}>
-                          {request.status}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`priority-dot priority-${request.priority.toLowerCase().replace(" ", "-")}`} />
-                        {request.priority}
-                      </td>
-                      <td>⋮</td>
+            {error && <p className="dashboard-alert error">{error}</p>}
+            {isLoading && <p className="dashboard-alert">Chargement des devis...</p>}
+
+            {!isLoading && !error && (
+              <div className="requests-table-wrap">
+                <table className="requests-table">
+                  <thead>
+                    <tr>
+                      <th>Nom du client</th>
+                      <th>Trajet</th>
+                      <th>Passagers</th>
+                      <th>Prix</th>
+                      <th>Statut</th>
+                      <th>Priorité</th>
+                      <th aria-label="Actions" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td colSpan="7">Aucun devis enregistré pour le moment.</td>
+                      </tr>
+                    ) : (
+                      rows.map((request) => (
+                        <tr key={request.id || request.ref}>
+                          <td>
+                            <strong>{request.client}</strong>
+                            <small>{request.ref}</small>
+                          </td>
+                          <td>{request.trip}</td>
+                          <td>{request.passengers}</td>
+                          <td>
+                            <b>{request.price}</b>
+                          </td>
+                          <td>
+                            <span className={`status-pill status-${normalizeStatus(request.status)}`}>
+                              {request.status}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`priority-dot priority-${normalizeStatus(request.priority)}`} />
+                            {request.priority}
+                          </td>
+                          <td>⋮</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div className="requests-bottom">
-              <span>Affichage de 5 sur 1 284 leads</span>
+              <span>Affichage de {rows.length} devis</span>
               <div>
                 <button type="button" disabled>Précédent</button>
                 <button className="active" type="button">1</button>
-                <button type="button">2</button>
-                <button type="button">3</button>
-                <button type="button">Suivant</button>
+                <button type="button" disabled>Suivant</button>
               </div>
             </div>
           </section>
@@ -180,7 +227,7 @@ function Dashboard() {
             <article className="advice-card">
               <strong>Conseil du jour</strong>
               <p>
-                Les demandes avec une "Validation humaine" nécessitent une vérification de la marge saisonnière.
+                Les demandes avec une "Validation humaine" nécessitent une vérification de la marge et de la capacité.
                 Traitez-les en priorité pour maintenir votre taux de conversion.
               </p>
             </article>
@@ -189,7 +236,7 @@ function Dashboard() {
               <div>
                 <span />
               </div>
-              <b>78% de l&apos;objectif</b>
+              <b>{rows.length ? "Données à jour" : "En attente de données"}</b>
             </article>
           </div>
         </section>

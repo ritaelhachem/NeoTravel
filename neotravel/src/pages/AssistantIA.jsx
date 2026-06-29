@@ -4,33 +4,62 @@ import "../App.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-const steps = [
+const baseSteps = [
   {
-    key: "departure",
+    key: "nom",
+    question: "Quel est votre nom ?",
+    placeholder: "Exemple : Rita El Hachem",
+  },
+  {
+    key: "email",
+    question: "Quelle est votre adresse e-mail ?",
+    placeholder: "Exemple : rita@email.com",
+  },
+  {
+    key: "telephone",
+    question: "Quel est votre numéro de téléphone ?",
+    placeholder: "Exemple : 06 00 00 00 00",
+  },
+  {
+    key: "ville_depart",
     question: "Pour commencer, quelle est votre ville de départ ?",
     placeholder: "Écrivez votre réponse ici...",
   },
   {
-    key: "destination",
+    key: "ville_arrivee",
     question: "Quelle est votre destination ?",
     placeholder: "Exemple : Lyon",
   },
   {
-    key: "passengers",
+    key: "nombre_passagers",
     question: "Combien de passagers voyagent avec vous ?",
     placeholder: "Exemple : 48",
   },
   {
-    key: "date",
+    key: "date_depart",
     question: "Quelle est la date du trajet ?",
-    placeholder: "Exemple : 15 juillet 2026",
+    placeholder: "Exemple : 2026-07-15",
   },
   {
-    key: "tripType",
+    key: "type_trajet",
     question: "Quel type de voyage organisez-vous ?",
-    placeholder: "Exemple : Aller-retour, sortie scolaire...",
+    placeholder: "",
   },
 ];
+
+const returnDateStep = {
+  key: "date_retour",
+  question: "Quelle est la date de retour ?",
+  placeholder: "Exemple : 2026-07-20",
+};
+
+function isRoundTrip(value) {
+  return String(value || "").toLowerCase().includes("retour");
+}
+
+function getSteps(answers) {
+  return isRoundTrip(answers.type_trajet) ? [...baseSteps, returnDateStep] : baseSteps;
+}
 
 const initialMessages = [
   {
@@ -43,56 +72,94 @@ const initialMessages = [
   },
   {
     from: "ai",
-    text: steps[0].question,
+    text: baseSteps[0].question,
   },
 ];
 
-const summaryItems = [
-  { key: "departure", label: "Départ", icon: "pin" },
-  { key: "destination", label: "Destination", icon: "go" },
-  { key: "date", label: "Date du trajet", icon: "cal" },
-  { key: "passengers", label: "Passagers", icon: "grp" },
-  { key: "tripType", label: "Type de voyage", icon: "rt" },
+const baseSummaryItems = [
+  { key: "ville_depart", label: "Départ", icon: "pin" },
+  { key: "ville_arrivee", label: "Destination", icon: "go" },
+  { key: "date_depart", label: "Date du trajet", icon: "cal" },
+  { key: "nombre_passagers", label: "Passagers", icon: "grp" },
+  { key: "type_trajet", label: "Type de voyage", icon: "rt" },
 ];
+
+const returnSummaryItem = { key: "date_retour", label: "Date de retour", icon: "cal" };
 
 function AssistantIA() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState(initialMessages);
   const [answers, setAnswers] = useState({
-    departure: "",
-    destination: "",
-    passengers: "",
-    date: "",
-    tripType: "",
+    nom: "",
+    email: "",
+    telephone: "",
+    ville_depart: "",
+    ville_arrivee: "",
+    nombre_passagers: "",
+    date_depart: "",
+    type_trajet: "",
+    date_retour: "",
   });
   const [currentStep, setCurrentStep] = useState(0);
   const [inputValue, setInputValue] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [quoteError, setQuoteError] = useState("");
 
-  const isComplete = useMemo(
-    () => steps.every((step) => String(answers[step.key]).trim().length > 0),
+  const visibleSteps = useMemo(() => getSteps(answers), [answers]);
+  const visibleSummaryItems = useMemo(
+    () => (isRoundTrip(answers.type_trajet) ? [...baseSummaryItems, returnSummaryItem] : baseSummaryItems),
     [answers]
+  );
+  const activeStep = visibleSteps[currentStep];
+
+  const isComplete = useMemo(
+    () => visibleSteps.every((step) => String(answers[step.key]).trim().length > 0),
+    [answers, visibleSteps]
   );
 
   const progressLabel = isComplete
     ? "Conversation complétée, votre devis peut être généré."
     : "Complétez la conversation pour générer le devis";
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const getInputType = () => {
+    if (activeStep?.key === "date_depart" || activeStep?.key === "date_retour") {
+      return "date";
+    }
 
-    const value = inputValue.trim();
-    if (!value || currentStep >= steps.length) {
+    if (activeStep?.key === "nombre_passagers") {
+      return "number";
+    }
+
+    return "text";
+  };
+
+  const submitStepValue = (rawValue) => {
+    const value = String(rawValue || "").trim();
+    if (!value || !activeStep || currentStep >= visibleSteps.length) {
       return;
     }
 
-    const activeStep = steps[currentStep];
+    if (activeStep.key === "date_retour" && answers.date_depart && value <= answers.date_depart) {
+      setQuoteError("La date de retour doit être après la date de départ.");
+      return;
+    }
+
+    setQuoteError("");
+    const nextAnswers = {
+      ...answers,
+      [activeStep.key]: value,
+    };
+
+    if (activeStep.key === "type_trajet" && !isRoundTrip(value)) {
+      nextAnswers.date_retour = "";
+    }
+
+    const nextSteps = getSteps(nextAnswers);
     const nextStepIndex = currentStep + 1;
     const nextMessages = [...messages, { from: "user", text: value }];
 
-    if (nextStepIndex < steps.length) {
-      nextMessages.push({ from: "ai", text: steps[nextStepIndex].question });
+    if (nextStepIndex < nextSteps.length) {
+      nextMessages.push({ from: "ai", text: nextSteps[nextStepIndex].question });
     } else {
       nextMessages.push({
         from: "ai",
@@ -100,13 +167,15 @@ function AssistantIA() {
       });
     }
 
-    setAnswers((previousAnswers) => ({
-      ...previousAnswers,
-      [activeStep.key]: value,
-    }));
+    setAnswers(nextAnswers);
     setMessages(nextMessages);
     setCurrentStep(nextStepIndex);
     setInputValue("");
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    submitStepValue(inputValue);
   };
 
   const handleGenerateQuote = async () => {
@@ -123,7 +192,11 @@ function AssistantIA() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(answers),
+        body: JSON.stringify({
+          ...answers,
+          nombre_passagers: Number(answers.nombre_passagers),
+          type_trajet: String(answers.type_trajet).toLowerCase().includes("retour") ? "aller-retour" : "aller-simple",
+        }),
       });
 
       const result = await response.json();
@@ -185,18 +258,33 @@ function AssistantIA() {
 
           <form className="assistant-input-area" onSubmit={handleSubmit}>
             <div className="assistant-input-shell">
-              <input
-                aria-label="Réponse utilisateur"
-                disabled={currentStep >= steps.length}
-                onChange={(event) => setInputValue(event.target.value)}
-                placeholder={currentStep < steps.length ? steps[currentStep].placeholder : "Toutes les réponses sont complètes"}
-                value={inputValue}
-              />
-              <button aria-label="Envoyer la réponse" disabled={!inputValue.trim() || currentStep >= steps.length} type="submit">
-                →
-              </button>
+              {activeStep?.key === "type_trajet" ? (
+                <div className="trip-choice-group" role="group" aria-label="Type de trajet">
+                  <button onClick={() => submitStepValue("aller-simple")} type="button">
+                    Aller simple
+                  </button>
+                  <button onClick={() => submitStepValue("aller-retour")} type="button">
+                    Aller-retour
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    aria-label="Réponse utilisateur"
+                    disabled={currentStep >= visibleSteps.length}
+                    min={activeStep?.key === "date_retour" ? answers.date_depart : activeStep?.key === "nombre_passagers" ? "1" : undefined}
+                    onChange={(event) => setInputValue(event.target.value)}
+                    placeholder={currentStep < visibleSteps.length ? activeStep.placeholder : "Toutes les réponses sont complètes"}
+                    type={getInputType()}
+                    value={inputValue}
+                  />
+                  <button aria-label="Envoyer la réponse" disabled={!inputValue.trim() || currentStep >= visibleSteps.length} type="submit">
+                    →
+                  </button>
+                </>
+              )}
             </div>
-            <small>Appuyez sur Entrée pour envoyer votre message</small>
+            <small>{activeStep?.key === "type_trajet" ? "Choisissez une option pour continuer" : "Appuyez sur Entrée pour envoyer votre message"}</small>
           </form>
         </section>
 
@@ -209,7 +297,7 @@ function AssistantIA() {
             <p>Les informations se mettent à jour en temps réel selon vos réponses à l&apos;assistant.</p>
 
             <div className="summary-list">
-              {summaryItems.map((item) => (
+              {visibleSummaryItems.map((item) => (
                 <div className="summary-row" key={item.key}>
                   <span className="summary-icon" aria-hidden="true">
                     {item.icon}
