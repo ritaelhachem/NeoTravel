@@ -1,5 +1,6 @@
 const supabase = require("../config/supabase");
 const { generateChatReply } = require("../services/openaiService");
+const { extractQuoteInfo } = require("../services/messageParser");
 
 async function sendMessage(req, res, next) {
   try {
@@ -34,6 +35,25 @@ async function sendMessage(req, res, next) {
   }
 }
 
+async function extractMessage(req, res, next) {
+  try {
+    const { message, answers = {} } = req.body;
+
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({
+        error: "Le champ message est obligatoire.",
+      });
+    }
+
+    const result = extractQuoteInfo(String(message).trim(), answers);
+
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   sendMessage,
+  extractMessage,
 };

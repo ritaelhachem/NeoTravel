@@ -808,6 +808,14 @@ a {
   color: #ffffff;
 }
 
+.inline-trip-choice {
+  margin-top: 14px;
+}
+
+.assistant-input-area > .inline-trip-choice button {
+  min-height: 42px;
+}
+
 .assistant-input-area small {
   color: #667085;
   display: block;

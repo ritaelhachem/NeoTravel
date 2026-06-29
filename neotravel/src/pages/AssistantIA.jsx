@@ -4,182 +4,173 @@ import "../App.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-const baseSteps = [
+const initialAnswers = {
+  nom: "",
+  email: "",
+  telephone: "",
+  ville_depart: "",
+  ville_arrivee: "",
+  nombre_passagers: "",
+  date_depart: "",
+  type_trajet: "",
+  date_retour: "",
+};
+
+const initialMessages = [
   {
-    key: "nom",
-    question: "Quel est votre nom ?",
-    placeholder: "Exemple : Rita El Hachem",
+    from: "ai",
+    text: "Bonjour ! Décrivez votre trajet en une phrase, je récupère automatiquement les informations utiles.",
   },
   {
-    key: "email",
-    question: "Quelle est votre adresse e-mail ?",
-    placeholder: "Exemple : rita@email.com",
-  },
-  {
-    key: "telephone",
-    question: "Quel est votre numéro de téléphone ?",
-    placeholder: "Exemple : 06 00 00 00 00",
-  },
-  {
-    key: "ville_depart",
-    question: "Pour commencer, quelle est votre ville de départ ?",
-    placeholder: "Écrivez votre réponse ici...",
-  },
-  {
-    key: "ville_arrivee",
-    question: "Quelle est votre destination ?",
-    placeholder: "Exemple : Lyon",
-  },
-  {
-    key: "nombre_passagers",
-    question: "Combien de passagers voyagent avec vous ?",
-    placeholder: "Exemple : 48",
-  },
-  {
-    key: "date_depart",
-    question: "Quelle est la date du trajet ?",
-    placeholder: "Exemple : 2026-07-15",
-  },
-  {
-    key: "type_trajet",
-    question: "Quel type de voyage organisez-vous ?",
-    placeholder: "",
+    from: "ai",
+    text: "Exemple : Je m'appelle Rita, mon mail est rita@test.com, je veux un Paris vers Lyon le 15/07/2026 pour 50 personnes en aller-retour le 20/07/2026.",
   },
 ];
 
-const returnDateStep = {
-  key: "date_retour",
-  question: "Quelle est la date de retour ?",
-  placeholder: "Exemple : 2026-07-20",
+const summaryItems = [
+  { key: "nom", label: "Nom", icon: "id" },
+  { key: "email", label: "E-mail", icon: "@" },
+  { key: "telephone", label: "Téléphone", icon: "tel" },
+  { key: "ville_depart", label: "Départ", icon: "pin" },
+  { key: "ville_arrivee", label: "Destination", icon: "go" },
+  { key: "date_depart", label: "Date aller", icon: "cal" },
+  { key: "date_retour", label: "Date retour", icon: "cal" },
+  { key: "nombre_passagers", label: "Passagers", icon: "grp" },
+  { key: "type_trajet", label: "Type de voyage", icon: "rt" },
+];
+
+const missingLabels = {
+  nom: "nom",
+  email: "e-mail",
+  telephone: "téléphone",
+  ville_depart: "ville de départ",
+  ville_arrivee: "ville d'arrivée",
+  nombre_passagers: "nombre de passagers",
+  date_depart: "date aller",
+  type_trajet: "type de trajet",
+  date_retour: "date retour",
 };
 
 function isRoundTrip(value) {
   return String(value || "").toLowerCase().includes("retour");
 }
 
-function getSteps(answers) {
-  return isRoundTrip(answers.type_trajet) ? [...baseSteps, returnDateStep] : baseSteps;
+function getFallbackMissingFields(answers) {
+  const fields = [
+    "nom",
+    "email",
+    "telephone",
+    "ville_depart",
+    "ville_arrivee",
+    "nombre_passagers",
+    "date_depart",
+    "type_trajet",
+  ];
+
+  if (isRoundTrip(answers.type_trajet)) {
+    fields.push("date_retour");
+  }
+
+  return fields.filter((field) => !String(answers[field] || "").trim());
 }
 
-const initialMessages = [
-  {
-    from: "ai",
-    text: "Bonjour ! Je suis l'assistant NeoTravel.",
-  },
-  {
-    from: "ai",
-    text: "Je vais vous aider à préparer votre devis de transport de groupe en quelques secondes.",
-  },
-  {
-    from: "ai",
-    text: baseSteps[0].question,
-  },
-];
+function formatTripType(value) {
+  if (!value) {
+    return "";
+  }
 
-const baseSummaryItems = [
-  { key: "ville_depart", label: "Départ", icon: "pin" },
-  { key: "ville_arrivee", label: "Destination", icon: "go" },
-  { key: "date_depart", label: "Date du trajet", icon: "cal" },
-  { key: "nombre_passagers", label: "Passagers", icon: "grp" },
-  { key: "type_trajet", label: "Type de voyage", icon: "rt" },
-];
-
-const returnSummaryItem = { key: "date_retour", label: "Date de retour", icon: "cal" };
+  return isRoundTrip(value) ? "Aller-retour" : "Aller simple";
+}
 
 function AssistantIA() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState(initialMessages);
-  const [answers, setAnswers] = useState({
-    nom: "",
-    email: "",
-    telephone: "",
-    ville_depart: "",
-    ville_arrivee: "",
-    nombre_passagers: "",
-    date_depart: "",
-    type_trajet: "",
-    date_retour: "",
-  });
-  const [currentStep, setCurrentStep] = useState(0);
+  const [answers, setAnswers] = useState(initialAnswers);
   const [inputValue, setInputValue] = useState("");
+  const [missingFields, setMissingFields] = useState(getFallbackMissingFields(initialAnswers));
+  const [isExtracting, setIsExtracting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [quoteError, setQuoteError] = useState("");
 
-  const visibleSteps = useMemo(() => getSteps(answers), [answers]);
   const visibleSummaryItems = useMemo(
-    () => (isRoundTrip(answers.type_trajet) ? [...baseSummaryItems, returnSummaryItem] : baseSummaryItems),
-    [answers]
-  );
-  const activeStep = visibleSteps[currentStep];
-
-  const isComplete = useMemo(
-    () => visibleSteps.every((step) => String(answers[step.key]).trim().length > 0),
-    [answers, visibleSteps]
+    () => summaryItems.filter((item) => item.key !== "date_retour" || isRoundTrip(answers.type_trajet)),
+    [answers.type_trajet]
   );
 
+  const isComplete = missingFields.length === 0;
   const progressLabel = isComplete
-    ? "Conversation complétée, votre devis peut être généré."
-    : "Complétez la conversation pour générer le devis";
+    ? "Toutes les informations sont complètes, votre devis peut être généré."
+    : `Informations manquantes : ${missingFields.map((field) => missingLabels[field] || field).join(", ")}`;
 
-  const getInputType = () => {
-    if (activeStep?.key === "date_depart" || activeStep?.key === "date_retour") {
-      return "date";
-    }
-
-    if (activeStep?.key === "nombre_passagers") {
-      return "number";
-    }
-
-    return "text";
-  };
-
-  const submitStepValue = (rawValue) => {
-    const value = String(rawValue || "").trim();
-    if (!value || !activeStep || currentStep >= visibleSteps.length) {
-      return;
-    }
-
-    if (activeStep.key === "date_retour" && answers.date_depart && value <= answers.date_depart) {
-      setQuoteError("La date de retour doit être après la date de départ.");
-      return;
-    }
-
-    setQuoteError("");
+  const applyExtraction = (result, userText) => {
     const nextAnswers = {
       ...answers,
-      [activeStep.key]: value,
+      ...(result.answers || {}),
     };
-
-    if (activeStep.key === "type_trajet" && !isRoundTrip(value)) {
-      nextAnswers.date_retour = "";
-    }
-
-    const nextSteps = getSteps(nextAnswers);
-    const nextStepIndex = currentStep + 1;
-    const nextMessages = [...messages, { from: "user", text: value }];
-
-    if (nextStepIndex < nextSteps.length) {
-      nextMessages.push({ from: "ai", text: nextSteps[nextStepIndex].question });
-    } else {
-      nextMessages.push({
-        from: "ai",
-        text: "Parfait, j'ai toutes les informations nécessaires pour générer votre devis.",
-      });
-    }
+    const nextMissingFields = result.missingFields || getFallbackMissingFields(nextAnswers);
 
     setAnswers(nextAnswers);
-    setMessages(nextMessages);
-    setCurrentStep(nextStepIndex);
-    setInputValue("");
+    setMissingFields(nextMissingFields);
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      { from: "user", text: userText },
+      { from: "ai", text: result.reply || "J'ai mis à jour votre demande." },
+    ]);
+  };
+
+  const submitFreeText = async (rawValue) => {
+    const value = String(rawValue || "").trim();
+
+    if (!value || isExtracting) {
+      return;
+    }
+
+    setIsExtracting(true);
+    setQuoteError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/extract`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: value,
+          answers,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Impossible d'analyser votre message.");
+      }
+
+      applyExtraction(result, value);
+      setInputValue("");
+    } catch (error) {
+      setQuoteError(error.message || "Impossible d'analyser votre message.");
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    submitStepValue(inputValue);
+    submitFreeText(inputValue);
+  };
+
+  const handleTripChoice = (typeTrajet) => {
+    submitFreeText(typeTrajet === "aller-retour" ? "C'est un aller-retour." : "C'est un aller simple.");
   };
 
   const handleGenerateQuote = async () => {
     if (!isComplete || isGenerating) {
+      return;
+    }
+
+    if (isRoundTrip(answers.type_trajet) && answers.date_retour <= answers.date_depart) {
+      setQuoteError("La date de retour doit être après la date de départ.");
       return;
     }
 
@@ -195,7 +186,7 @@ function AssistantIA() {
         body: JSON.stringify({
           ...answers,
           nombre_passagers: Number(answers.nombre_passagers),
-          type_trajet: String(answers.type_trajet).toLowerCase().includes("retour") ? "aller-retour" : "aller-simple",
+          type_trajet: isRoundTrip(answers.type_trajet) ? "aller-retour" : "aller-simple",
         }),
       });
 
@@ -241,7 +232,7 @@ function AssistantIA() {
               <span className="status-dot" aria-hidden="true" />
               <span>Assistant IA actif</span>
             </div>
-            <span className="mode-pill">Mode automatique</span>
+            <span className="mode-pill">Phrase libre</span>
           </div>
 
           <div className="assistant-thread">
@@ -257,34 +248,35 @@ function AssistantIA() {
           </div>
 
           <form className="assistant-input-area" onSubmit={handleSubmit}>
-            <div className="assistant-input-shell">
-              {activeStep?.key === "type_trajet" ? (
-                <div className="trip-choice-group" role="group" aria-label="Type de trajet">
-                  <button onClick={() => submitStepValue("aller-simple")} type="button">
-                    Aller simple
-                  </button>
-                  <button onClick={() => submitStepValue("aller-retour")} type="button">
-                    Aller-retour
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    aria-label="Réponse utilisateur"
-                    disabled={currentStep >= visibleSteps.length}
-                    min={activeStep?.key === "date_retour" ? answers.date_depart : activeStep?.key === "nombre_passagers" ? "1" : undefined}
-                    onChange={(event) => setInputValue(event.target.value)}
-                    placeholder={currentStep < visibleSteps.length ? activeStep.placeholder : "Toutes les réponses sont complètes"}
-                    type={getInputType()}
-                    value={inputValue}
-                  />
-                  <button aria-label="Envoyer la réponse" disabled={!inputValue.trim() || currentStep >= visibleSteps.length} type="submit">
-                    →
-                  </button>
-                </>
-              )}
+            <div className="assistant-input-shell phrase-input-shell">
+              <input
+                aria-label="Message utilisateur"
+                disabled={isExtracting}
+                onChange={(event) => setInputValue(event.target.value)}
+                placeholder="Écrivez une phrase complète ou ajoutez seulement l'information manquante..."
+                type="text"
+                value={inputValue}
+              />
+              <button aria-label="Envoyer le message" disabled={!inputValue.trim() || isExtracting} type="submit">
+                →
+              </button>
             </div>
-            <small>{activeStep?.key === "type_trajet" ? "Choisissez une option pour continuer" : "Appuyez sur Entrée pour envoyer votre message"}</small>
+            <small>
+              {isExtracting
+                ? "Analyse du message..."
+                : "Vous pouvez tout écrire en une phrase. L'assistant demandera seulement ce qui manque."}
+            </small>
+
+            {!answers.type_trajet && (
+              <div className="trip-choice-group inline-trip-choice" role="group" aria-label="Type de trajet">
+                <button onClick={() => handleTripChoice("aller-simple")} type="button">
+                  Aller simple
+                </button>
+                <button onClick={() => handleTripChoice("aller-retour")} type="button">
+                  Aller-retour
+                </button>
+              </div>
+            )}
           </form>
         </section>
 
@@ -292,22 +284,26 @@ function AssistantIA() {
           <section className="trip-summary-card">
             <div className="summary-title">
               <span className="summary-clock" aria-hidden="true" />
-              <h1>Résumé de votre trajet</h1>
+              <h1>Résumé de votre demande</h1>
             </div>
-            <p>Les informations se mettent à jour en temps réel selon vos réponses à l&apos;assistant.</p>
+            <p>Les informations détectées se mettent à jour automatiquement à partir de vos phrases.</p>
 
             <div className="summary-list">
-              {visibleSummaryItems.map((item) => (
-                <div className="summary-row" key={item.key}>
-                  <span className="summary-icon" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <span>{answers[item.key] || "En attente..."}</span>
+              {visibleSummaryItems.map((item) => {
+                const value = item.key === "type_trajet" ? formatTripType(answers[item.key]) : answers[item.key];
+
+                return (
+                  <div className="summary-row" key={item.key}>
+                    <span className="summary-icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                    <div>
+                      <strong>{item.label}</strong>
+                      <span>{value || "En attente..."}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
