@@ -25,11 +25,7 @@ const initialConsents = {
 const initialMessages = [
   {
     from: "ai",
-    text: "Bonjour ! Décrivez votre trajet en une phrase, je récupère automatiquement les informations utiles.",
-  },
-  {
-    from: "ai",
-    text: "Exemple : Je m'appelle Rita, mon mail est rita@test.com, je veux un Paris vers Lyon le 15/07/2026 pour 50 personnes en aller-retour le 20/07/2026.",
+    text: "Bonjour ! Pour préparer votre devis, décrivez-moi votre voyage en quelques mots : ville de départ, destination, date(s) et nombre de voyageurs. Je m'occupe du reste.",
   },
 ];
 
@@ -139,7 +135,12 @@ function AssistantIA() {
     setQuoteError("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat/extract`, {
+      const conversationHistory = messages.map((message) => ({
+        role: message.from === "ai" ? "assistant" : "user",
+        content: message.text,
+      }));
+
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -147,6 +148,7 @@ function AssistantIA() {
         body: JSON.stringify({
           message: value,
           answers,
+          history: conversationHistory,
         }),
       });
 
