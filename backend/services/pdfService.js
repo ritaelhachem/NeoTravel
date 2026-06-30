@@ -45,7 +45,9 @@ function formatDate(value) {
 
 function getTollLabel(details = {}) {
   if (details?.status === "calculated") {
-    return "TollGuru";
+    return details.toll_count
+      ? `TollGuru · ${details.toll_count} péage${details.toll_count > 1 ? "s" : ""}`
+      : "TollGuru";
   }
 
   if (details?.status === "estimated_fallback") {

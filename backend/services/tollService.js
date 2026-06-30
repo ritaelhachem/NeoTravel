@@ -4,12 +4,13 @@ const TOLLGURU_URL = "https://apis.tollguru.com/toll/v2/origin-destination-waypo
 
 function getNumericCost(costs = {}) {
   const candidates = [
+    costs.tagAndCash,
     costs.tag,
     costs.cash,
-    costs.licensePlate,
     costs.prepaidCard,
     costs.minimumTollCost,
     costs.maximumTollCost,
+    costs.licensePlate,
   ];
 
   const value = candidates.find(
@@ -17,6 +18,38 @@ function getNumericCost(costs = {}) {
   );
 
   return value === undefined ? 0 : Number(value);
+}
+
+function summarizeTolls(tolls = []) {
+  if (!Array.isArray(tolls)) {
+    return [];
+  }
+
+  return tolls.map((toll) => ({
+    type: toll.type || null,
+    amount: getNumericCost({
+      tagAndCash: toll.tagAndCash,
+      tag: toll.tagCost,
+      cash: toll.cashCost,
+      prepaidCard: toll.prepaidCardCost,
+      licensePlate: toll.licensePlateCost,
+    }),
+    currency: toll.currency || "EUR",
+    start: toll.start
+      ? {
+          name: toll.start.name || null,
+          road: toll.start.road || null,
+          state: toll.start.state || null,
+        }
+      : null,
+    end: toll.end
+      ? {
+          name: toll.end.name || null,
+          road: toll.end.road || null,
+          state: toll.end.state || null,
+        }
+      : null,
+  }));
 }
 
 function estimateToll(distanceKm, typeTrajet) {
@@ -47,16 +80,24 @@ async function requestTollGuru({ villeDepart, villeArrivee, vehicleType }) {
     }
   );
 
-  console.log("TOLLGURU RESPONSE:", JSON.stringify(response.data, null, 2));
-
   const route = response.data?.routes?.[0] || response.data?.route || {};
-  const amount = getNumericCost(route.costs || response.data?.costs);
+  const costs = route.costs || response.data?.costs || {};
+  const amount = getNumericCost(costs);
 
   return {
     amount,
-    currency: response.data?.currency || route.currency || "EUR",
+    currency: costs.currency || response.data?.currency || route.currency || "EUR",
     provider: "TollGuru",
     vehicle_type: vehicleType,
+    fuel: Number(costs.fuel || 0),
+    toll_count: Array.isArray(route.tolls) ? route.tolls.length : 0,
+    tolls: summarizeTolls(route.tolls),
+    route: {
+      name: route.summary?.name || route.name || null,
+      url: route.summary?.url || route.url || null,
+      distance_km: Math.round(Number(route.summary?.distance?.value || route.distance?.value || 0) / 1000) || null,
+      duration_seconds: route.summary?.duration?.value || route.duration?.value || null,
+    },
     raw_status: response.data?.status || "ok",
   };
 }

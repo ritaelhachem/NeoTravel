@@ -103,7 +103,9 @@ function QuoteResult() {
           title: "Péages",
           subtitle:
             quote.tollDetails?.status === "calculated"
-              ? "Calcul TollGuru"
+              ? quote.tollDetails?.toll_count
+                ? `Calcul TollGuru · ${quote.tollDetails.toll_count} péage${quote.tollDetails.toll_count > 1 ? "s" : ""}`
+                : "Calcul TollGuru"
               : quote.tollDetails?.status === "estimated_fallback"
                 ? "Estimation distance - TollGuru indisponible"
                 : "Estimation non disponible",
