@@ -1004,6 +1004,136 @@ a {
   text-align: center;
 }
 
+.rgpd-consent-section {
+  background: #f8f9fa;
+  border: 1px solid #e7e9ee;
+  border-radius: 12px;
+  margin: 20px auto 0;
+  max-width: 420px;
+  padding: 20px;
+}
+
+.rgpd-consent-section h2 {
+  font-size: 14px;
+  font-weight: 900;
+  margin: 0 0 16px 0;
+  color: var(--ink);
+}
+
+.consent-item {
+  display: flex;
+  margin-bottom: 14px;
+}
+
+.consent-item:last-child {
+  margin-bottom: 0;
+}
+
+.consent-item label {
+  align-items: flex-start;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+}
+
+.consent-item input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+}
+
+.consent-item span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.consent-item strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.consent-item a {
+  color: #0066cc;
+  text-decoration: underline;
+}
+
+.consent-item a:hover {
+  color: #0052a3;
+}
+
+.consent-item.optional span {
+  color: var(--muted);
+}
+
+.consents-modal-overlay {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100%;
+  padding: 40px 20px;
+}
+
+.consents-modal {
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+  max-width: 500px;
+  width: 100%;
+  padding: 40px;
+}
+
+.consents-modal-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.consents-modal-header h1 {
+  font-size: 24px;
+  font-weight: 900;
+  margin: 0 0 8px 0;
+  color: var(--ink);
+}
+
+.consents-modal-header p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.consents-accept-button {
+  background: var(--dark);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  margin: 24px auto 0;
+  padding: 12px 28px;
+  text-transform: uppercase;
+  transition: all 0.2s;
+  width: 100%;
+  max-width: 420px;
+}
+
+.consents-accept-button:not(:disabled):hover {
+  background: #242627;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.consents-accept-button:disabled {
+  background: #e7e9ee;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .help-card {
   background: #eef5ff;
   border: 1px solid #c7ddff;

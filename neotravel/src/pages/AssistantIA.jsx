@@ -15,6 +15,13 @@ const initialAnswers = {
   date_retour: "",
 };
 
+const initialConsents = {
+  dataUsage: false, // Consentement pour utiliser les données
+  terms: false, // Conditions d'utilisation
+  privacy: false, // Politique de confidentialité
+  marketing: false, // Communications marketing
+};
+
 const initialMessages = [
   {
     from: "ai",
@@ -85,16 +92,20 @@ function AssistantIA() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState(initialMessages);
   const [answers, setAnswers] = useState(initialAnswers);
+  const [consents, setConsents] = useState(initialConsents);
   const [inputValue, setInputValue] = useState("");
   const [missingFields, setMissingFields] = useState(getFallbackMissingFields(initialAnswers));
   const [isExtracting, setIsExtracting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [quoteError, setQuoteError] = useState("");
+  const [showConsentsModal, setShowConsentsModal] = useState(true);
 
   const visibleSummaryItems = useMemo(
     () => summaryItems.filter((item) => item.key !== "date_retour" || isRoundTrip(answers.type_trajet)),
     [answers.type_trajet]
   );
+
+  const consentsComplete = consents.dataUsage && consents.terms && consents.privacy;
 
   const isComplete = missingFields.length === 0;
   const progressLabel = isComplete
@@ -163,8 +174,19 @@ function AssistantIA() {
     submitFreeText(typeTrajet === "aller-retour" ? "C'est un aller-retour." : "C'est un aller simple.");
   };
 
+  const handleAcceptConsents = () => {
+    const updatedConsents = {
+      ...consents,
+      dataUsage: true,
+      terms: true,
+      privacy: true,
+    };
+    setConsents(updatedConsents);
+    setShowConsentsModal(false);
+  };
+
   const handleGenerateQuote = async () => {
-    if (!isComplete || isGenerating) {
+    if (!isComplete || !consentsComplete || isGenerating) {
       return;
     }
 
@@ -186,6 +208,7 @@ function AssistantIA() {
           ...answers,
           nombre_passagers: Number(answers.nombre_passagers),
           type_trajet: isRoundTrip(answers.type_trajet) ? "aller-retour" : "aller-simple",
+          consents: consents,
         }),
       });
 
@@ -225,6 +248,80 @@ function AssistantIA() {
       </header>
 
       <main className="assistant-workspace">
+        {showConsentsModal ? (
+          <section className="consents-modal-overlay">
+            <div className="consents-modal">
+              <div className="consents-modal-header">
+                <h1>Bienvenue sur NeoTravel</h1>
+                <p>Avant de commencer, veuillez accepter les conditions essentielles</p>
+              </div>
+
+              <section className="rgpd-consent-section">
+                <div className="consent-item">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={consents.dataUsage}
+                      onChange={(e) => setConsents({ ...consents, dataUsage: e.target.checked })}
+                    />
+                    <span>
+                      <strong>Utilisation de vos données</strong> - Acceptez que vos données personnelles soient utilisées pour créer votre devis de transport.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="consent-item">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={consents.terms}
+                      onChange={(e) => setConsents({ ...consents, terms: e.target.checked })}
+                    />
+                    <span>
+                      <strong>Conditions d'utilisation</strong> - Je reconnais avoir lu et accepté les <a href="#terms" target="_blank" rel="noopener noreferrer">conditions d'utilisation</a> de NeoTravel.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="consent-item">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={consents.privacy}
+                      onChange={(e) => setConsents({ ...consents, privacy: e.target.checked })}
+                    />
+                    <span>
+                      <strong>Politique de confidentialité</strong> - Je reconnais avoir lu et accepté la <a href="#privacy" target="_blank" rel="noopener noreferrer">politique de confidentialité</a> et le traitement de mes données.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="consent-item optional">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={consents.marketing}
+                      onChange={(e) => setConsents({ ...consents, marketing: e.target.checked })}
+                    />
+                    <span>
+                      <strong>(Optionnel)</strong> Recevoir les offres et actualités de NeoTravel par email.
+                    </span>
+                  </label>
+                </div>
+              </section>
+
+              <button 
+                className="consents-accept-button" 
+                disabled={!consents.dataUsage || !consents.terms || !consents.privacy}
+                onClick={handleAcceptConsents}
+                type="button"
+              >
+                Accepter et continuer →
+              </button>
+            </div>
+          </section>
+        ) : (
+          <>
         <section className="assistant-chat-panel" aria-label="Conversation assistant IA">
           <div className="assistant-panel-top">
             <div className="assistant-status">
@@ -308,21 +405,19 @@ function AssistantIA() {
 
           <div className={`completion-note ${isComplete ? "ready" : ""}`}>{progressLabel}</div>
 
-          <button className="generate-quote-button" disabled={!isComplete || isGenerating} onClick={handleGenerateQuote} type="button">
+          <button className="generate-quote-button" disabled={!isComplete || !consentsComplete || isGenerating} onClick={handleGenerateQuote} type="button">
             {isGenerating ? "Génération en cours..." : "Générer mon devis"} <span aria-hidden="true">→</span>
           </button>
 
           {quoteError && <p className="quote-error" role="alert">{quoteError}</p>}
-
-          <p className="quote-terms">
-            En générant ce devis, vous acceptez nos conditions générales d&apos;utilisation et de service.
-          </p>
 
           <div className="help-card">
             <strong>Besoin d&apos;aide ?</strong>
             <p>Nos conseillers sont disponibles du lundi au vendredi de 9h à 18h au 01 23 45 67 89.</p>
           </div>
         </aside>
+          </>
+        )}
       </main>
 
       <footer className="assistant-footer">
