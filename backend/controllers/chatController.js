@@ -1,5 +1,5 @@
 const supabase = require("../config/supabase");
-const { generateChatReply } = require("../services/openaiService");
+const { generateChatReply } = require("../services/vercelAIService");
 const { extractQuoteInfo } = require("../services/messageParser");
 
 async function sendMessage(req, res, next) {
