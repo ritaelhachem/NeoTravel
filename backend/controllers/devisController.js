@@ -1,8 +1,26 @@
 const supabase = require("../config/supabase");
 const calculerDevis = require("../services/calculerDevis");
 const calculateDistanceKm = require("../services/distanceService");
+const calculateTollCost = require("../services/tollService");
 const { sendQuoteEmail } = require("../services/mailService");
 const { createQuotePdfBuffer, getReference } = require("../services/pdfService");
+
+function normalizeCityName(city) {
+  let value = String(city || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s+(?:aller[-\s]?retour|aller\s+simple|retour|simple).*$/i, "")
+    .replace(/\s+(?:demain|aujourd'hui|aujourdhui|apres-demain|après-demain).*$/i, "")
+    .replace(/\s+(?:le|la|pour|avec|en|aller|retour)$/i, "");
+
+  let previous;
+  do {
+    previous = value;
+    value = value.replace(/^(?:salut|bonjour|je\s+veux|je\s+voudrais|j'aimerais|aller|trajet|un|une|de|depuis)\s+/i, "");
+  } while (value !== previous);
+
+  return value.trim();
+}
 
 function buildSavedCalcul(devis = {}, fallbackCalcul = {}) {
   const client = devis.clients || {};
@@ -14,6 +32,8 @@ function buildSavedCalcul(devis = {}, fallbackCalcul = {}) {
     nombre_passagers: client.nombre_passagers,
     type_trajet: client.type_trajet,
     distance_km: client.distance_km,
+    peage: devis.peage ?? fallbackCalcul?.peage,
+    details_peage: devis.details_peage ?? fallbackCalcul?.details_peage,
   };
 
   const computedCalcul =
@@ -41,6 +61,8 @@ function buildSavedCalcul(devis = {}, fallbackCalcul = {}) {
 async function createDevis(req, res, next) {
   try {
     const input = req.body;
+    input.ville_depart = normalizeCityName(input.ville_depart);
+    input.ville_arrivee = normalizeCityName(input.ville_arrivee);
 
     if (String(input.type_trajet || "").includes("retour")) {
       if (!input.date_retour) {
@@ -58,6 +80,18 @@ async function createDevis(req, res, next) {
 
     if (!input.distance_km) {
       input.distance_km = await calculateDistanceKm(input.ville_depart, input.ville_arrivee);
+    }
+
+    if (input.peage === undefined || input.peage === null || input.peage === "") {
+      const toll = await calculateTollCost({
+        villeDepart: input.ville_depart,
+        villeArrivee: input.ville_arrivee,
+        typeTrajet: input.type_trajet,
+        distanceKm: input.distance_km,
+      });
+
+      input.peage = toll.amount;
+      input.details_peage = toll;
     }
 
     const calcul = calculerDevis(input);
@@ -106,6 +140,8 @@ async function createDevis(req, res, next) {
       .insert({
         client_id: client.id,
         prix: calcul.prix,
+        peage: calcul.peage,
+        details_peage: calcul.details_peage,
         pdf: null,
         statut: calcul.est_complexe ? "En validation" : "Envoyé",
       })

@@ -29,6 +29,9 @@ function normalizeQuote(state) {
     distanceKm: rawQuote.distance_km || rawQuote.distanceKm || 120,
     estimatedPrice: rawQuote.prix || rawQuote.estimatedPrice || rawQuote.estimated_price || 0,
     basePrice: rawQuote.base_price || rawQuote.breakdown?.basePrice || 0,
+    transportPrice: rawQuote.cout_transport_hors_peage || rawQuote.breakdown?.transportPrice || rawQuote.base_price || 0,
+    tollCost: rawQuote.peage || 0,
+    tollDetails: rawQuote.details_peage || null,
     margin: rawQuote.marge ?? "15%",
     seasonCoeff: rawQuote.coefficient_saison || 0,
     urgencyCoeff: rawQuote.coefficient_urgence || 0,
@@ -93,8 +96,23 @@ function QuoteResult() {
     ? []
     : [
         {
-          title: "Base tarifaire",
+          title: "Transport hors péage",
           subtitle: `${quote.distanceKm} km · ${quote.tripType}`,
+          value: formatCurrency(quote.transportPrice, quote.currency),
+        },
+        {
+          title: "Péages",
+          subtitle:
+            quote.tollDetails?.status === "calculated"
+              ? "Calcul TollGuru"
+              : quote.tollDetails?.status === "estimated_fallback"
+                ? "Estimation distance - TollGuru indisponible"
+                : "Estimation non disponible",
+          value: formatCurrency(quote.tollCost, quote.currency),
+        },
+        {
+          title: "Base commerciale",
+          subtitle: "Transport + péages",
           value: formatCurrency(quote.basePrice, quote.currency),
         },
         {
@@ -139,6 +157,9 @@ function QuoteResult() {
     nombre_passagers: quote.passengers,
     type_trajet: quote.tripType,
     distance_km: quote.distanceKm,
+    cout_transport_hors_peage: quote.transportPrice,
+    peage: quote.tollCost,
+    details_peage: quote.tollDetails,
     prix: quote.estimatedPrice,
     est_complexe: quote.isComplex,
     motif_complexite: quote.complexityReason,

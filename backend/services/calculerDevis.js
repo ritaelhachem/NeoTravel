@@ -65,10 +65,13 @@ function calculerDevis(data) {
     type_trajet,
     date_depart,
     date_retour,
+    peage = 0,
+    details_peage = null,
   } = data;
 
   const distance = Number(distance_km);
   const passengers = Number(nombre_passagers);
+  const tollCost = Math.max(0, Number(peage || 0));
 
   const capacityCoeff = getCapacityCoeff(passengers);
 
@@ -82,6 +85,9 @@ function calculerDevis(data) {
       date_depart,
       date_retour,
       base_price: null,
+      cout_transport_hors_peage: null,
+      peage: tollCost,
+      details_peage,
       marge: 0.15,
       coefficient_saison: null,
       coefficient_urgence: null,
@@ -92,11 +98,13 @@ function calculerDevis(data) {
     };
   }
 
-  let basePrice = getBasePrice(distance);
+  let transportPrice = getBasePrice(distance);
 
   if (type_trajet === "aller-retour") {
-    basePrice = basePrice * 2;
+    transportPrice = transportPrice * 2;
   }
+
+  const basePrice = transportPrice + tollCost;
 
   const marginCoeff = 0.15;
   const month = new Date(date_depart).getMonth() + 1;
@@ -120,6 +128,9 @@ function calculerDevis(data) {
     date_retour,
 
     base_price: Math.round(basePrice),
+    cout_transport_hors_peage: Math.round(transportPrice),
+    peage: Math.round(tollCost),
+    details_peage,
     marge: 0.15,
     coefficient_saison: seasonCoeff,
     coefficient_urgence: urgencyCoeff,

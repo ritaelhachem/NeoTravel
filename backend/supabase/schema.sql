@@ -20,6 +20,8 @@ create table if not exists public.devis (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.clients(id) on delete cascade,
   prix integer,
+  peage decimal default 0,
+  details_peage jsonb,
   pdf text,
   statut text not null default 'Envoyé',
   date_creation timestamptz not null default now()

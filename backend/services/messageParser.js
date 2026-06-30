@@ -65,13 +65,18 @@ function capitalizeWords(value) {
 }
 
 function cleanCityName(value) {
-  return capitalizeWords(
-    cleanValue(value)
-      .replace(/^(?:salut|bonjour|je\s+veux|je\s+voudrais|j'aimerais|aller|trajet|un|une|de|depuis)\s+/i, "")
-      .replace(/\s+(?:aller[-\s]?retour|aller\s+simple|retour|simple).*$/i, "")
-      .replace(/\s+(?:demain|aujourd'hui|aujourdhui|apres-demain|apres demain|après-demain|après demain).*$/i, "")
-      .replace(/\s+(?:le|la|pour|avec|en|aller|retour)$/i, "")
-  );
+  let city = cleanValue(value)
+    .replace(/\s+(?:aller[-\s]?retour|aller\s+simple|retour|simple).*$/i, "")
+    .replace(/\s+(?:demain|aujourd'hui|aujourdhui|apres-demain|apres demain|après-demain|après demain).*$/i, "")
+    .replace(/\s+(?:le|la|pour|avec|en|aller|retour)$/i, "");
+
+  let previous;
+  do {
+    previous = city;
+    city = city.replace(/^(?:salut|bonjour|je\s+veux|je\s+voudrais|j'aimerais|aller|trajet|un|une|de|depuis)\s+/i, "");
+  } while (city !== previous);
+
+  return capitalizeWords(city);
 }
 
 function normalizeDate(value) {

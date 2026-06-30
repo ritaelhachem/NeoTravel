@@ -11,10 +11,14 @@ const colors = {
 };
 
 function formatPrice(value) {
-  return new Intl.NumberFormat("fr-FR", {
+  const formatted = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(Number(value || 0)) + " €";
+  })
+    .format(Number(value || 0))
+    .replace(/[\u00a0\u202f]/g, " ");
+
+  return `${formatted} EUR`;
 }
 
 function formatCoeff(value) {
@@ -39,17 +43,33 @@ function formatDate(value) {
   }).format(date);
 }
 
+function getTollLabel(details = {}) {
+  if (details?.status === "calculated") {
+    return "TollGuru";
+  }
+
+  if (details?.status === "estimated_fallback") {
+    return "Estimation distance";
+  }
+
+  return "Estimation non disponible";
+}
+
 function getReference(devis = {}, client = {}) {
   const id = devis?.id || client?.id;
   return id ? `NT-${String(id).slice(0, 8).toUpperCase()}` : "NT-PROVISOIRE";
 }
 
 function text(doc, value, options = {}) {
+  const normalizedValue = String(value ?? "")
+    .replace(/[\u00a0\u202f]/g, " ")
+    .replace(/[·•]/g, "-");
+
   doc
     .font(options.bold ? "Helvetica-Bold" : "Helvetica")
     .fontSize(options.size || 10)
     .fillColor(options.color || colors.ink)
-    .text(String(value ?? ""), options.x, options.y, options);
+    .text(normalizedValue, options.x, options.y, options);
 }
 
 function labelValue(doc, label, value, x, y, width) {
@@ -206,7 +226,7 @@ function createQuotePdfBuffer({ client = {}, calcul = {}, devis = {} }) {
     );
 
     doc
-      .roundedRect(48, 426, 499, calcul.est_complexe ? 118 : 338, 8)
+      .roundedRect(48, 426, 499, calcul.est_complexe ? 118 : 370, 8)
       .fillAndStroke("#ffffff", colors.line);
 
     text(doc, "Calcul commercial détaillé", {
@@ -242,18 +262,20 @@ function createQuotePdfBuffer({ client = {}, calcul = {}, devis = {} }) {
         color: colors.muted,
       });
 
-      drawTableRow(doc, 504, "Base tarifaire", `${calcul.distance_km} km · ${calcul.type_trajet}`, formatPrice(calcul.base_price));
-      drawTableRow(doc, 538, "Marge commerciale", "Frais de service NeoTravel", formatCoeff(calcul.marge), false, true);
-      drawTableRow(doc, 572, "Coefficient saison", "Selon le mois du départ", formatCoeff(calcul.coefficient_saison), false, Number(calcul.coefficient_saison) > 0);
-      drawTableRow(doc, 606, "Coefficient urgence", "Selon le délai avant départ", formatCoeff(calcul.coefficient_urgence), false, Number(calcul.coefficient_urgence) > 0);
-      drawTableRow(doc, 640, "Coefficient capacité", `${calcul.nombre_passagers} passagers`, formatCoeff(calcul.coefficient_capacite), true, Number(calcul.coefficient_capacite) > 0);
+      drawTableRow(doc, 504, "Transport hors péage", `${calcul.distance_km} km · ${calcul.type_trajet}`, formatPrice(calcul.cout_transport_hors_peage ?? calcul.base_price));
+      drawTableRow(doc, 538, "Péages", getTollLabel(calcul.details_peage), formatPrice(calcul.peage));
+      drawTableRow(doc, 572, "Base commerciale", "Transport + péages", formatPrice(calcul.base_price));
+      drawTableRow(doc, 606, "Marge commerciale", "Frais de service NeoTravel", formatCoeff(calcul.marge), false, true);
+      drawTableRow(doc, 640, "Coefficient saison", "Selon le mois du départ", formatCoeff(calcul.coefficient_saison), false, Number(calcul.coefficient_saison) > 0);
+      drawTableRow(doc, 674, "Coefficient urgence", "Selon le délai avant départ", formatCoeff(calcul.coefficient_urgence), false, Number(calcul.coefficient_urgence) > 0);
+      drawTableRow(doc, 708, "Coefficient capacité", `${calcul.nombre_passagers} passagers`, formatCoeff(calcul.coefficient_capacite), true, Number(calcul.coefficient_capacite) > 0);
 
       doc
-        .roundedRect(320, 680, 209, 62, 8)
+        .roundedRect(320, 730, 209, 52, 8)
         .fillAndStroke(colors.dark, colors.dark);
       text(doc, "Total estimé TTC", {
         x: 338,
-        y: 696,
+        y: 742,
         width: 173,
         size: 9,
         color: "#d7dae0",
@@ -261,9 +283,9 @@ function createQuotePdfBuffer({ client = {}, calcul = {}, devis = {} }) {
       });
       text(doc, formatPrice(calcul.prix), {
         x: 338,
-        y: 714,
+        y: 758,
         width: 173,
-        size: 21,
+        size: 18,
         bold: true,
         color: "#ffffff",
         align: "right",
@@ -274,7 +296,7 @@ function createQuotePdfBuffer({ client = {}, calcul = {}, devis = {} }) {
         "Les prix peuvent varier selon la disponibilité réelle des transporteurs au moment de la validation.",
         {
           x: 66,
-          y: 694,
+          y: 744,
           width: 225,
           size: 8.5,
           color: colors.muted,
@@ -287,7 +309,7 @@ function createQuotePdfBuffer({ client = {}, calcul = {}, devis = {} }) {
       "Ce devis est provisoire et reste soumis à la disponibilité réelle des transporteurs au moment de la validation. Les services inclus comprennent chauffeur, carburant et assurances obligatoires.",
       {
         x: 48,
-        y: 792,
+        y: 806,
         width: 499,
         size: 8.5,
         color: colors.muted,
