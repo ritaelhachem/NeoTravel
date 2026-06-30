@@ -11,7 +11,24 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-function createTransporter() {
+async function resolveSmtpHost(hostname) {
+  if (!hostname) {
+    return null;
+  }
+
+  try {
+    const addresses = await dns.promises.resolve4(hostname);
+    return addresses[0] || hostname;
+  } catch (error) {
+    console.error("SMTP DNS IPV4 ERROR:", {
+      host: hostname,
+      message: error.message,
+    });
+    return hostname;
+  }
+}
+
+async function createTransporter() {
   if (!process.env.SMTP_HOST) {
     return nodemailer.createTransport({
       jsonTransport: true,
@@ -25,9 +42,15 @@ function createTransporter() {
           pass: process.env.SMTP_PASS,
         }
       : undefined;
+  const smtpHost = process.env.SMTP_HOST;
+  const resolvedHost = await resolveSmtpHost(smtpHost);
+  console.log("SMTP RESOLVED HOST:", {
+    host: smtpHost,
+    resolvedHost,
+  });
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host: resolvedHost,
     port: Number(process.env.SMTP_PORT || 587),
     secure: process.env.SMTP_SECURE === "true",
     family: 4,
@@ -36,6 +59,9 @@ function createTransporter() {
     },
     auth,
     requireTLS: process.env.SMTP_SECURE !== "true",
+    tls: {
+      servername: smtpHost,
+    },
     connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 10000),
     greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10000),
     socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 15000),
@@ -92,7 +118,7 @@ async function sendQuoteEmail({ to, client, calcul, devis }) {
     throw error;
   }
 
-  const transporter = createTransporter();
+  const transporter = await createTransporter();
   const text = buildQuoteText({ client, calcul, devis });
   const pdfBuffer = await createQuotePdfBuffer({ client, calcul, devis });
   const reference = getReference(devis, client).toLowerCase();
