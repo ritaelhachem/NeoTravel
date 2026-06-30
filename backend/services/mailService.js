@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const dns = require("dns");
+const axios = require("axios");
 const { createQuotePdfBuffer, getReference } = require("./pdfService");
 
 dns.setDefaultResultOrder("ipv4first");
@@ -111,6 +112,102 @@ function buildQuoteText({ client = {}, calcul = {}, devis = {} }) {
   ].filter(Boolean).join("\n");
 }
 
+function buildQuoteHtml({ client = {}, calcul = {}, devis = {} }) {
+  devis = devis || {};
+  const reference = devis.id ? `NT-${String(devis.id).slice(0, 8).toUpperCase()}` : "NT-PROVISOIRE";
+
+  return `
+    <div style="font-family: Arial, sans-serif; color: #191b22; line-height: 1.5;">
+      <h2 style="margin: 0 0 12px;">Votre devis NeoTravel est prêt</h2>
+      <p>Bonjour ${client.nom || ""},</p>
+      <p>Vous trouverez votre devis NeoTravel en pièce jointe.</p>
+      <ul>
+        <li><strong>Trajet :</strong> ${calcul.ville_depart || "-"} → ${calcul.ville_arrivee || "-"}</li>
+        <li><strong>Date aller :</strong> ${calcul.date_depart || "-"}</li>
+        ${calcul.date_retour ? `<li><strong>Date retour :</strong> ${calcul.date_retour}</li>` : ""}
+        <li><strong>Passagers :</strong> ${calcul.nombre_passagers || "-"}</li>
+        <li><strong>Prix estimé TTC :</strong> ${formatCurrency(calcul.prix)}</li>
+        <li><strong>Référence :</strong> ${reference}</li>
+      </ul>
+      <p>Ce devis reste provisoire jusqu'à validation de la disponibilité transporteur.</p>
+      <p>NeoTravel</p>
+    </div>
+  `;
+}
+
+async function sendQuoteEmailWithBrevo({ to, client, calcul, devis, text, pdfBuffer, reference }) {
+  const apiKey = process.env.BREVO_API_KEY;
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const senderEmail = process.env.BREVO_FROM_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER;
+  const senderName = process.env.BREVO_FROM_NAME || "NeoTravel";
+
+  if (!senderEmail) {
+    const error = new Error("BREVO_FROM_EMAIL manquante.");
+    error.status = 500;
+    throw error;
+  }
+
+  try {
+    const response = await axios.post(
+      "https://api.brevo.com/v3/smtp/email",
+      {
+        sender: {
+          name: senderName,
+          email: senderEmail,
+        },
+        to: [
+          {
+            email: to,
+            name: client?.nom || undefined,
+          },
+        ],
+        subject: calcul?.est_complexe ? "Votre demande NeoTravel est en validation" : "Votre devis NeoTravel",
+        textContent: text,
+        htmlContent: buildQuoteHtml({ client, calcul, devis }),
+        attachment: [
+          {
+            name: `devis-${reference}.pdf`,
+            content: pdfBuffer.toString("base64"),
+          },
+        ],
+      },
+      {
+        headers: {
+          "api-key": apiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        timeout: Number(process.env.BREVO_TIMEOUT || 15000),
+      }
+    );
+
+    return {
+      messageId: response.data?.messageId || response.data?.messageIds?.[0] || null,
+      provider: "brevo",
+      simulated: false,
+      attachment: `devis-${reference}.pdf`,
+    };
+  } catch (error) {
+    console.error("BREVO ERROR:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
+
+    const brevoError = new Error(
+      `Envoi e-mail Brevo impossible (${error.response?.status || error.code || "API"}): ${
+        error.response?.data?.message || error.message
+      }`
+    );
+    brevoError.status = error.response?.status || 502;
+    throw brevoError;
+  }
+}
+
 async function sendQuoteEmail({ to, client, calcul, devis }) {
   if (!to) {
     const error = new Error("Adresse e-mail destinataire manquante.");
@@ -122,6 +219,20 @@ async function sendQuoteEmail({ to, client, calcul, devis }) {
   const text = buildQuoteText({ client, calcul, devis });
   const pdfBuffer = await createQuotePdfBuffer({ client, calcul, devis });
   const reference = getReference(devis, client).toLowerCase();
+
+  const brevoResult = await sendQuoteEmailWithBrevo({
+    to,
+    client,
+    calcul,
+    devis,
+    text,
+    pdfBuffer,
+    reference,
+  });
+
+  if (brevoResult) {
+    return brevoResult;
+  }
 
   let info;
 
