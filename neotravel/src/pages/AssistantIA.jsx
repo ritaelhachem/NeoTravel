@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import API_BASE_URL from "../config/api";
 import "../App.css";
 
@@ -30,15 +30,15 @@ const initialMessages = [
 ];
 
 const summaryItems = [
-  { key: "nom", label: "Nom", icon: "id" },
-  { key: "email", label: "E-mail", icon: "@" },
-  { key: "telephone", label: "Téléphone", icon: "tel" },
-  { key: "ville_depart", label: "Départ", icon: "pin" },
-  { key: "ville_arrivee", label: "Destination", icon: "go" },
-  { key: "date_depart", label: "Date aller", icon: "cal" },
-  { key: "date_retour", label: "Date retour", icon: "cal" },
-  { key: "nombre_passagers", label: "Passagers", icon: "grp" },
-  { key: "type_trajet", label: "Type de voyage", icon: "rt" },
+  { key: "nom", label: "Nom" },
+  { key: "email", label: "E-mail" },
+  { key: "telephone", label: "Téléphone", optional: true },
+  { key: "ville_depart", label: "Départ" },
+  { key: "ville_arrivee", label: "Destination" },
+  { key: "date_depart", label: "Date aller" },
+  { key: "date_retour", label: "Date retour" },
+  { key: "nombre_passagers", label: "Passagers" },
+  { key: "type_trajet", label: "Type de voyage" },
 ];
 
 const missingLabels = {
@@ -61,7 +61,6 @@ function getFallbackMissingFields(answers) {
   const fields = [
     "nom",
     "email",
-    "telephone",
     "ville_depart",
     "ville_arrivee",
     "nombre_passagers",
@@ -84,8 +83,26 @@ function formatTripType(value) {
   return isRoundTrip(value) ? "Aller-retour" : "Aller simple";
 }
 
+function getAvailableDates() {
+  const dates = [];
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  while (dates.length < 3) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) {
+      dates.push(new Date(d));
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+function formatAppointmentDate(date) {
+  return date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+}
+
 function AssistantIA() {
   const navigate = useNavigate();
+  const threadRef = useRef(null);
   const [messages, setMessages] = useState(initialMessages);
   const [answers, setAnswers] = useState(initialAnswers);
   const [consents, setConsents] = useState(initialConsents);
@@ -95,11 +112,26 @@ function AssistantIA() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [quoteError, setQuoteError] = useState("");
   const [showConsentsModal, setShowConsentsModal] = useState(true);
+  const [showCommercialWidget, setShowCommercialWidget] = useState(false);
+  const [widgetCompleted, setWidgetCompleted] = useState(false);
+
+  const availableDates = useMemo(() => getAvailableDates(), []);
 
   const visibleSummaryItems = useMemo(
     () => summaryItems.filter((item) => item.key !== "date_retour" || isRoundTrip(answers.type_trajet)),
     [answers.type_trajet]
   );
+
+  const requiredSummaryItems = useMemo(
+    () => visibleSummaryItems.filter((item) => !item.optional),
+    [visibleSummaryItems]
+  );
+
+  useEffect(() => {
+    if (threadRef.current) {
+      threadRef.current.scrollTop = threadRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const consentsComplete = consents.dataUsage && consents.terms && consents.privacy;
 
@@ -109,19 +141,47 @@ function AssistantIA() {
     : `Informations manquantes : ${missingFields.map((field) => missingLabels[field] || field).join(", ")}`;
 
   const applyExtraction = (result, userText) => {
-    const nextAnswers = {
-      ...answers,
-      ...(result.answers || {}),
-    };
+    const nextAnswers = { ...answers, ...(result.answers || {}) };
     const nextMissingFields = result.missingFields || getFallbackMissingFields(nextAnswers);
+    const userCount = messages.filter((m) => m.from === "user").length + 1;
+    const passengerCount = parseInt(nextAnswers.nombre_passagers) || 0;
+
+    const newMessages = [
+      ...messages,
+      { from: "user", text: userText },
+      { from: "ai", text: result.reply || "J'ai mis à jour votre demande." },
+    ];
+
+    let triggerCommercial = false;
+
+    if (!showCommercialWidget) {
+      if (result.needsCommercial) {
+        triggerCommercial = true;
+      } else if (result.citiesNotInFrance) {
+        triggerCommercial = true;
+      } else if (passengerCount > 60) {
+        newMessages.push({ from: "ai", text: "Avec plus de 60 voyageurs, nos conseillers peuvent vous accompagner personnellement pour établir la meilleure offre." });
+        triggerCommercial = true;
+      } else if (userCount >= 10 && nextMissingFields.length > 0) {
+        newMessages.push({ from: "ai", text: "Pour finaliser votre devis, nos conseillers restent disponibles pour vous accompagner directement." });
+        triggerCommercial = true;
+      }
+    }
 
     setAnswers(nextAnswers);
     setMissingFields(nextMissingFields);
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      { from: "user", text: userText },
-      { from: "ai", text: result.reply || "J'ai mis à jour votre demande." },
-    ]);
+    setMessages(newMessages);
+    if (triggerCommercial) setShowCommercialWidget(true);
+  };
+
+  const handleDateSelect = (date) => {
+    setMessages((m) => [...m, { from: "ai", text: `Parfait. Un conseiller vous contactera le ${formatAppointmentDate(date)} pour finaliser votre demande.` }]);
+    setWidgetCompleted(true);
+  };
+
+  const handleCallASAP = () => {
+    setMessages((m) => [...m, { from: "ai", text: "Entendu. Un conseiller vous rappellera dans les plus brefs délais." }]);
+    setWidgetCompleted(true);
   };
 
   const submitFreeText = async (rawValue) => {
@@ -333,12 +393,26 @@ function AssistantIA() {
             <span className="mode-pill">Phrase libre</span>
           </div>
 
-          <div className="assistant-thread">
+          <div className="assistant-thread" ref={threadRef}>
             {messages.map((message, index) => (
               <div className={`assistant-message-row ${message.from}`} key={`${message.from}-${index}`}>
                 <p className="assistant-bubble">{message.text}</p>
               </div>
             ))}
+            {showCommercialWidget && !widgetCompleted && (
+              <div className="commercial-widget">
+                <span className="commercial-widget-label">Choisir un créneau</span>
+                {availableDates.map((date, i) => (
+                  <button key={i} className="date-btn" onClick={() => handleDateSelect(date)} type="button">
+                    {formatAppointmentDate(date)}
+                  </button>
+                ))}
+                <div className="commercial-divider" />
+                <button className="callback-btn" onClick={handleCallASAP} type="button">
+                  Être rappelé au plus vite
+                </button>
+              </div>
+            )}
           </div>
 
           <form className="assistant-input-area" onSubmit={handleSubmit}>
@@ -384,13 +458,13 @@ function AssistantIA() {
           <section className="trip-summary-card">
             <div className="summary-title">
               <h1>Résumé de votre demande</h1>
-              <span className="summary-badge">{visibleSummaryItems.length - missingFields.length}/{visibleSummaryItems.length}</span>
+              <span className="summary-badge">{requiredSummaryItems.length - missingFields.length}/{requiredSummaryItems.length}</span>
             </div>
 
             <div className="summary-progress-track">
               <div
                 className="summary-progress-fill"
-                style={{ width: `${Math.round(((visibleSummaryItems.length - missingFields.length) / visibleSummaryItems.length) * 100)}%` }}
+                style={{ width: `${Math.round(((requiredSummaryItems.length - missingFields.length) / requiredSummaryItems.length) * 100)}%` }}
               />
             </div>
 
@@ -400,13 +474,13 @@ function AssistantIA() {
                 const isFilled = Boolean(value);
 
                 return (
-                  <div className={`summary-row ${isFilled ? "summary-row--filled" : "summary-row--empty"}`} key={item.key}>
+                  <div className={`summary-row ${isFilled ? "summary-row--filled" : "summary-row--empty"}${item.optional ? " summary-row--optional" : ""}`} key={item.key}>
                     <span className="summary-status-dot" aria-hidden="true">
                       {isFilled ? "✓" : ""}
                     </span>
                     <div>
-                      <strong>{item.label}</strong>
-                      <span>{value || "En attente..."}</span>
+                      <strong>{item.label}{item.optional && <span className="optional-tag"> · optionnel</span>}</strong>
+                      <span>{value || "—"}</span>
                     </div>
                   </div>
                 );
@@ -421,11 +495,6 @@ function AssistantIA() {
           </button>
 
           {quoteError && <p className="quote-error" role="alert">{quoteError}</p>}
-
-          <div className="help-card">
-            <strong>Besoin d&apos;aide ?</strong>
-            <p>Nos conseillers sont disponibles du lundi au vendredi de 9h à 18h au 01 23 45 67 89.</p>
-          </div>
         </aside>
           </>
         )}

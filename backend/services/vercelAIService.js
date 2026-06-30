@@ -6,7 +6,7 @@ dotenv.config({ path: path.resolve(__dirname, "..", ".env"), override: true });
 const AI_BASE_URL = (process.env.AI_BASE_URL || "https://ai-gateway.vercel.sh/v1").replace(/\/+$/, "");
 
 const REQUIRED_FIELDS = [
-  "nom", "email", "telephone",
+  "nom", "email",
   "ville_depart", "ville_arrivee",
   "nombre_passagers", "date_depart", "type_trajet",
 ];
@@ -23,7 +23,7 @@ const FIELD_LABELS = {
   date_retour: "date de retour",
 };
 
-const VALID_FIELDS = new Set([...REQUIRED_FIELDS, "date_retour"]);
+const VALID_FIELDS = new Set([...REQUIRED_FIELDS, "date_retour", "telephone"]);
 
 // Aliases pour corriger les noms de champs que l'IA donne parfois
 const FIELD_ALIASES = {
@@ -65,7 +65,7 @@ function computeMissingFields(answers) {
 }
 
 function describeCollected(answers) {
-  return REQUIRED_FIELDS.concat(["date_retour"])
+  return REQUIRED_FIELDS.concat(["date_retour", "telephone"])
     .filter((f) => String(answers[f] || "").trim())
     .map((f) => `${FIELD_LABELS[f]}: ${answers[f]}`)
     .join(", ") || "aucune";
@@ -73,6 +73,41 @@ function describeCollected(answers) {
 
 function describeMissing(fields) {
   return fields.map((f) => FIELD_LABELS[f] || f).join(", ") || "aucun";
+}
+
+// Détection double devis par regex — avant appel IA
+const DOUBLE_DEVIS_PATTERNS = [
+  /\b2\s+devis\b/i,
+  /\bdeux\s+devis\b/i,
+  /\bdouble\s+devis\b/i,
+  /\bplusieurs\s+devis\b/i,
+  /\bun\s+(autre|deuxi[eè]me|second)\s+devis\b/i,
+  /\bun\s+devis\b.{0,80}\bun\s+(autre|deuxi[eè]me|second)\b/i,
+];
+
+function detectDoubleDevis(message) {
+  return DOUBLE_DEVIS_PATTERNS.some((p) => p.test(message));
+}
+
+// Liste de villes étrangères connues — fallback si l'IA ne flag pas
+const FOREIGN_CITIES = new Set([
+  "london", "londres", "madrid", "bruxelles", "brussels", "berlin", "rome",
+  "roma", "amsterdam", "geneve", "genève", "zurich", "zürich", "vienne",
+  "wien", "prague", "varsovie", "warsaw", "moscou", "moscow", "lisbonne",
+  "lisbon", "barcelone", "barcelona", "milan", "milano", "budapest",
+  "bucarest", "bucharest", "athenes", "athènes", "athens", "stockholm",
+  "copenhague", "copenhagen", "oslo", "helsinki", "dublin", "edinburgh",
+  "edimbourg", "manchester", "birmingham", "new york", "los angeles",
+  "toronto", "montréal", "montreal", "dubai", "doha", "singapour",
+  "singapore", "tokyo", "pékin", "pekin", "beijing", "shanghai",
+  "hong kong", "sydney", "melbourne", "tunis", "alger", "algiers",
+  "casablanca", "marrakech", "le caire", "cairo", "lagos", "nairobi",
+]);
+
+function hasForeignCity(answers) {
+  return [answers.ville_depart, answers.ville_arrivee]
+    .filter(Boolean)
+    .some((city) => FOREIGN_CITIES.has(city.toLowerCase().trim()));
 }
 
 // Extrait email et téléphone par regex (patterns fiables à 100%)
@@ -93,6 +128,17 @@ async function generateChatReply({ message, context, answers = {}, history = [] 
       reply: "Pour activer l'assistant, ajoutez VERCEL_AI_API_KEY dans backend/.env.",
       answers: {},
       missingFields: computeMissingFields(answers),
+    };
+  }
+
+  // Détection fiable du double devis — court-circuit avant l'IA
+  if (detectDoubleDevis(message)) {
+    return {
+      reply: "Pour des demandes multiples, nos conseillers peuvent vous accompagner directement.",
+      answers: {},
+      missingFields: computeMissingFields(answers),
+      needsCommercial: true,
+      citiesNotInFrance: false,
     };
   }
 
@@ -119,7 +165,7 @@ INFORMATIONS MANQUANTES : ${describeMissing(missingFields)}
 EXTRACTION — noms de champs EXACTS à utiliser dans "answers" :
   "nom"              → prénom/nom du client OU nom de l'entreprise/organisation
   "email"            → adresse e-mail
-  "telephone"        → numéro de téléphone
+  "telephone"        → numéro de téléphone (FACULTATIF — ne pas le demander si non mentionné)
   "ville_depart"     → ville ou lieu de départ
   "ville_arrivee"    → ville ou lieu d'arrivée
   "nombre_passagers" → nombre total de passagers (entier, en chiffres)
@@ -149,15 +195,23 @@ RÈGLES DE RÉPONSE — ABSOLUES :
 - Transport TOUJOURS en autocar. Jamais d'autre service.
 - Français direct et naturel. Pas de "Parfait !", "Super !", "Excellent !".
 
+VILLES HORS FRANCE : Dès qu'une ville est extraite pour ville_depart ou ville_arrivee, vérifie si elle est bien en France (métropole ou outre-mer). Si l'une d'elles est à l'étranger, ajoute "cities_not_in_france":true et explique dans "reply" qu'un conseiller accompagne les trajets internationaux.
+
+DOUBLE DEVIS : Si le client demande 2 devis distincts simultanément (ex: "un devis pour Paris et un autre pour Lyon", "je veux deux devis", "deux trajets différents"), ajoute "needs_commercial":true et explique dans "reply" qu'un conseiller peut gérer les demandes multiples.
+
 EXEMPLES :
 Client : "je pars de Nantes vers Paris le 19 octobre, retour le 29, nous serons 32, pour l'entreprise Apple"
-→ {"reply":"Pour finaliser votre devis, j'aurais besoin de votre adresse e-mail et d'un numéro de téléphone.","answers":{"ville_depart":"Nantes","ville_arrivee":"Paris","date_depart":"${currentYear}-10-19","date_retour":"${currentYear}-10-29","nombre_passagers":"32","type_trajet":"aller-retour","nom":"Apple"}}
+→ {"reply":"Pour finaliser votre devis, j'aurais besoin de votre adresse e-mail.","answers":{"ville_depart":"Nantes","ville_arrivee":"Paris","date_depart":"${currentYear}-10-19","date_retour":"${currentYear}-10-29","nombre_passagers":"32","type_trajet":"aller-retour","nom":"Apple"}}
 
 Client : "je veux partir demain de Lyon vers Marseille"
 → {"reply":"Combien de passagers et quel type de trajet (aller simple ou aller-retour) ?","answers":{"ville_depart":"Lyon","ville_arrivee":"Marseille","date_depart":"${tomorrowISO}"}}
 
+Client : "je veux partir de Paris vers Londres le 10 juillet avec 25 personnes"
+→ {"reply":"Ce trajet est à l'international. Nos conseillers peuvent vous proposer une solution adaptée.","answers":{"ville_depart":"Paris","ville_arrivee":"Londres","date_depart":"${currentYear}-07-10","nombre_passagers":"25"},"cities_not_in_france":true}
+
 FORMAT DE SORTIE : JSON pur, sans balises markdown.
-{"reply":"ta réponse","answers":{"champ":"valeur"}}`;
+{"reply":"...","answers":{...}}
+Avec villes étrangères : {"reply":"...","answers":{...},"cities_not_in_france":true}`;
 
   try {
     const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
@@ -196,12 +250,16 @@ FORMAT DE SORTIE : JSON pur, sans balises markdown.
 
     let reply = rawContent;
     let aiAnswers = {};
+    let needsCommercial = false;
+    let citiesNotInFrance = false;
 
     if (jsonText) {
       try {
         const parsed = JSON.parse(jsonText);
         if (parsed.reply) reply = parsed.reply;
         aiAnswers = parsed.answers || {};
+        if (parsed.needs_commercial === true) needsCommercial = true;
+        if (parsed.cities_not_in_france === true) citiesNotInFrance = true;
       } catch {
         // JSON invalide : on garde le texte brut comme reply
       }
@@ -220,7 +278,12 @@ FORMAT DE SORTIE : JSON pur, sans balises markdown.
     const mergedAnswers = { ...answers, ...newAnswers };
     const finalMissing = computeMissingFields(mergedAnswers);
 
-    return { reply, answers: newAnswers, missingFields: finalMissing };
+    // Fallback : vérification des villes étrangères même si l'IA n'a pas flaggé
+    if (!citiesNotInFrance && hasForeignCity(mergedAnswers)) {
+      citiesNotInFrance = true;
+    }
+
+    return { reply, answers: newAnswers, missingFields: finalMissing, needsCommercial, citiesNotInFrance };
   } catch (error) {
     console.error("Vercel AI Service Error:", error.message);
     throw error;
