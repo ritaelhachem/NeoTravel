@@ -1,5 +1,4 @@
 const { createClient } = require("@supabase/supabase-js");
-const WebSocket = require("ws");
 
 const supabaseUrl = (process.env.SUPABASE_URL || "")
   .trim()
@@ -14,13 +13,6 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-const supabase =
-  supabaseUrl && supabaseKey
-    ? createClient(supabaseUrl, supabaseKey, {
-        realtime: {
-          transport: WebSocket,
-        },
-      })
-    : null;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 module.exports = supabase;
