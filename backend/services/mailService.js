@@ -27,6 +27,7 @@ function createTransporter() {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: process.env.SMTP_SECURE === "true",
+    family: 4,
     auth,
     connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 10000),
     greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10000),
@@ -98,6 +99,7 @@ async function sendQuoteEmail({ to, client, calcul, devis }) {
       secure: process.env.SMTP_SECURE,
       user: process.env.SMTP_USER,
       from: process.env.SMTP_FROM,
+      family: 4,
     });
 
     info = await transporter.sendMail({
@@ -114,6 +116,19 @@ async function sendQuoteEmail({ to, client, calcul, devis }) {
       ],
     });
   } catch (error) {
+    console.error("SMTP ERROR:", {
+      code: error.code,
+      errno: error.errno,
+      syscall: error.syscall,
+      address: error.address,
+      port: error.port,
+      command: error.command,
+      responseCode: error.responseCode,
+      response: error.response,
+      message: error.message,
+      stack: error.stack,
+    });
+
     const mailError = new Error(
       `Envoi e-mail impossible (${error.code || error.responseCode || "SMTP"}): ${error.message}`
     );
