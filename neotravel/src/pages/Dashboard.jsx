@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import API_BASE_URL from "../config/api";
 import "../App.css";
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 function formatCurrency(value) {
   if (value === null || value === undefined) {

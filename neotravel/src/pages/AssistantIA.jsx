@@ -1,8 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
+import API_BASE_URL from "../config/api";
 import "../App.css";
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 const initialAnswers = {
   nom: "",

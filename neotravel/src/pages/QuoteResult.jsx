@@ -1,8 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
+import API_BASE_URL from "../config/api";
 import "../App.css";
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 function formatCurrency(value, currency = "EUR") {
   return new Intl.NumberFormat("fr-FR", {
