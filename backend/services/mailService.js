@@ -28,6 +28,9 @@ function createTransporter() {
     port: Number(process.env.SMTP_PORT || 587),
     secure: process.env.SMTP_SECURE === "true",
     auth,
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 10000),
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 15000),
   });
 }
 
@@ -86,19 +89,29 @@ async function sendQuoteEmail({ to, client, calcul, devis }) {
   const pdfBuffer = await createQuotePdfBuffer({ client, calcul, devis });
   const reference = getReference(devis, client).toLowerCase();
 
-  const info = await transporter.sendMail({
-    from: process.env.SMTP_FROM || "NeoTravel <no-reply@neotravel.local>",
-    to,
-    subject: calcul?.est_complexe ? "Votre demande NeoTravel est en validation" : "Votre devis NeoTravel",
-    text,
-    attachments: [
-      {
-        filename: `devis-${reference}.pdf`,
-        content: pdfBuffer,
-        contentType: "application/pdf",
-      },
-    ],
-  });
+  let info;
+
+  try {
+    info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || "NeoTravel <no-reply@neotravel.local>",
+      to,
+      subject: calcul?.est_complexe ? "Votre demande NeoTravel est en validation" : "Votre devis NeoTravel",
+      text,
+      attachments: [
+        {
+          filename: `devis-${reference}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+  } catch (error) {
+    const mailError = new Error(
+      `Envoi e-mail impossible (${error.code || error.responseCode || "SMTP"}): ${error.message}`
+    );
+    mailError.status = 502;
+    throw mailError;
+  }
 
   return {
     messageId: info.messageId,
