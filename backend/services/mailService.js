@@ -1,5 +1,8 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
 const { createQuotePdfBuffer, getReference } = require("./pdfService");
+
+dns.setDefaultResultOrder("ipv4first");
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("fr-FR", {
@@ -28,6 +31,9 @@ function createTransporter() {
     port: Number(process.env.SMTP_PORT || 587),
     secure: process.env.SMTP_SECURE === "true",
     family: 4,
+    lookup(hostname, options, callback) {
+      return dns.lookup(hostname, { ...options, family: 4 }, callback);
+    },
     auth,
     connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 10000),
     greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10000),
