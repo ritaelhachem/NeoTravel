@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../config/api";
+import { signOutAdmin } from "../services/adminAuth";
 import "../App.css";
 
 function formatCurrency(value) {
@@ -42,6 +43,7 @@ function buildRows(devis = []) {
 }
 
 function Dashboard() {
+  const navigate = useNavigate();
   const [devis, setDevis] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -94,6 +96,11 @@ function Dashboard() {
     { label: "Validation humaine", value: validationCount, trend: "", color: "red" },
   ];
 
+  const handleSignOut = () => {
+    signOutAdmin();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <div className="dashboard-page">
       <aside className="dashboard-sidebar">
@@ -135,6 +142,7 @@ function Dashboard() {
             <div className="dashboard-actions">
               <button type="button">Derniers 30 jours</button>
               <Link className="dark-action" to="/assistant">Nouvelle demande</Link>
+              <button type="button" onClick={handleSignOut}>Déconnexion</button>
             </div>
           </div>
 

@@ -1,8 +1,20 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import AssistantIA from "./pages/AssistantIA";
 import QuoteResult from "./pages/QuoteResult";
 import Dashboard from "./pages/Dashboard";
+import AdminLogin from "./pages/AdminLogin";
+import { isAdminAuthenticated } from "./services/adminAuth";
+
+function ProtectedRoute({ children }) {
+  const location = useLocation();
+
+  if (!isAdminAuthenticated()) {
+    return <Navigate replace state={{ from: location }} to="/login" />;
+  }
+
+  return children;
+}
 
 function App() {
   return (
@@ -11,7 +23,15 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/assistant" element={<AssistantIA />} />
         <Route path="/devis" element={<QuoteResult />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/login" element={<AdminLogin />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
