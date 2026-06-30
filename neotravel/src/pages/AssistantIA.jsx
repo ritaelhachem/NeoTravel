@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import API_BASE_URL from "../config/api";
 import "../App.css";
@@ -102,16 +102,27 @@ function formatAppointmentDate(date) {
 
 function AssistantIA() {
   const navigate = useNavigate();
+  const location = useLocation();
   const threadRef = useRef(null);
-  const [messages, setMessages] = useState(initialMessages);
-  const [answers, setAnswers] = useState(initialAnswers);
+
+  const isModification = location.state?.modification === true;
+  const restoredAnswers = isModification ? (location.state?.answers || initialAnswers) : initialAnswers;
+  const restoredMessages = isModification
+    ? [
+        ...(location.state?.messages || initialMessages),
+        { from: "ai", text: "Bien sûr. Qu'aimeriez-vous modifier ?" },
+      ]
+    : initialMessages;
+
+  const [messages, setMessages] = useState(restoredMessages);
+  const [answers, setAnswers] = useState(restoredAnswers);
   const [consents, setConsents] = useState(initialConsents);
   const [inputValue, setInputValue] = useState("");
-  const [missingFields, setMissingFields] = useState(getFallbackMissingFields(initialAnswers));
+  const [missingFields, setMissingFields] = useState(getFallbackMissingFields(restoredAnswers));
   const [isExtracting, setIsExtracting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [quoteError, setQuoteError] = useState("");
-  const [showConsentsModal, setShowConsentsModal] = useState(true);
+  const [showConsentsModal, setShowConsentsModal] = useState(!isModification);
   const [showCommercialWidget, setShowCommercialWidget] = useState(false);
   const [widgetCompleted, setWidgetCompleted] = useState(false);
 
@@ -281,7 +292,7 @@ function AssistantIA() {
       }
 
       navigate("/devis", {
-        state: result,
+        state: { ...result, _chatAnswers: answers, _chatMessages: messages },
       });
     } catch (error) {
       setQuoteError(error.message || "Impossible de générer le devis.");
@@ -340,7 +351,7 @@ function AssistantIA() {
                       onChange={(e) => setConsents({ ...consents, terms: e.target.checked })}
                     />
                     <span>
-                      <strong>Conditions d'utilisation</strong> - Je reconnais avoir lu et accepté les <a href="#terms" target="_blank" rel="noopener noreferrer">conditions d'utilisation</a> de NeoTravel.
+                      <strong>Conditions d'utilisation</strong> - Je reconnais avoir lu et accepté les <a href="/conditions" target="_blank" rel="noopener noreferrer">conditions d'utilisation</a> de NeoTravel.
                     </span>
                   </label>
                 </div>
@@ -353,7 +364,7 @@ function AssistantIA() {
                       onChange={(e) => setConsents({ ...consents, privacy: e.target.checked })}
                     />
                     <span>
-                      <strong>Politique de confidentialité</strong> - Je reconnais avoir lu et accepté la <a href="#privacy" target="_blank" rel="noopener noreferrer">politique de confidentialité</a> et le traitement de mes données.
+                      <strong>Politique de confidentialité</strong> - Je reconnais avoir lu et accepté la <a href="/privacy" target="_blank" rel="noopener noreferrer">politique de confidentialité</a> et le traitement de mes données.
                     </span>
                   </label>
                 </div>
@@ -372,13 +383,23 @@ function AssistantIA() {
                 </div>
               </section>
 
-              <button 
-                className="consents-accept-button" 
+              <button
+                className="consents-accept-all-button"
+                onClick={() => {
+                  setConsents({ dataUsage: true, terms: true, privacy: true, marketing: false });
+                  setShowConsentsModal(false);
+                }}
+                type="button"
+              >
+                Tout accepter
+              </button>
+              <button
+                className="consents-accept-button"
                 disabled={!consents.dataUsage || !consents.terms || !consents.privacy}
                 onClick={handleAcceptConsents}
                 type="button"
               >
-                Accepter et continuer →
+                Accepter la sélection →
               </button>
             </div>
           </section>
@@ -501,7 +522,7 @@ function AssistantIA() {
       </main>
 
       <footer className="assistant-footer">
-        <p>© 2024 NeoTravel. Tous droits réservés.</p>
+        <p>© 2026 NeoTravel. Tous droits réservés.</p>
         <div>
           <a href="#conditions">Conditions</a>
           <a href="#privacy">Confidentialité</a>

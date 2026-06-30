@@ -183,7 +183,7 @@ function LandingPage() {
           </div>
         </div>
 
-        <p className="copyright">© 2024 NeoTravel. Propulsé par l&apos;IA.</p>
+        <p className="copyright">© 2026 NeoTravel. Propulsé par l&apos;IA.</p>
       </footer>
     </div>
   );

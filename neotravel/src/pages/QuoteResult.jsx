@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import API_BASE_URL from "../config/api";
 import "../App.css";
@@ -53,6 +53,7 @@ function formatMargin(value) {
 
 function QuoteResult() {
   const { state } = useLocation();
+  const navigate = useNavigate();
   const [emailStatus, setEmailStatus] = useState(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState(null);
@@ -394,7 +395,15 @@ function QuoteResult() {
                   {emailStatus.text}
                 </p>
               )}
-              <button className="dark-action" type="button">Demander une modification</button>
+              <button
+                className="dark-action"
+                onClick={() => navigate("/assistant", {
+                  state: { modification: true, answers: state?._chatAnswers, messages: state?._chatMessages },
+                })}
+                type="button"
+              >
+                Demander une modification
+              </button>
               <dl>
                 <div>
                   <dt>Référence</dt>
@@ -417,10 +426,10 @@ function QuoteResult() {
       </main>
 
       <footer className="quote-footer">
-        <p>© 2024 NeoTravel. Tous droits réservés.</p>
+        <p>© 2026 NeoTravel. Tous droits réservés.</p>
         <div>
-          <a href="#conditions">Conditions</a>
-          <a href="#privacy">Confidentialité</a>
+          <Link to="/conditions" target="_blank">Conditions</Link>
+          <Link to="/privacy" target="_blank">Confidentialité</Link>
           <a href="#contact">Contact</a>
         </div>
       </footer>

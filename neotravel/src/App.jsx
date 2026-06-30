@@ -4,6 +4,8 @@ import AssistantIA from "./pages/AssistantIA";
 import QuoteResult from "./pages/QuoteResult";
 import Dashboard from "./pages/Dashboard";
 import AdminLogin from "./pages/AdminLogin";
+import ConditionsPage from "./pages/ConditionsPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import { isAdminAuthenticated } from "./services/adminAuth";
 
 function ProtectedRoute({ children }) {
@@ -24,6 +26,8 @@ function App() {
         <Route path="/assistant" element={<AssistantIA />} />
         <Route path="/devis" element={<QuoteResult />} />
         <Route path="/login" element={<AdminLogin />} />
+        <Route path="/conditions" element={<ConditionsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route
           path="/dashboard"
           element={
