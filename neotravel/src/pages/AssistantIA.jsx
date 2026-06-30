@@ -336,34 +336,36 @@ function AssistantIA() {
           <div className="assistant-thread">
             {messages.map((message, index) => (
               <div className={`assistant-message-row ${message.from}`} key={`${message.from}-${index}`}>
-                {message.from === "ai" && <span className="assistant-avatar" aria-hidden="true" />}
-                <div>
-                  <p className="assistant-bubble">{message.text}</p>
-                  <time>09:31 AM</time>
-                </div>
+                <p className="assistant-bubble">{message.text}</p>
               </div>
             ))}
           </div>
 
           <form className="assistant-input-area" onSubmit={handleSubmit}>
             <div className="assistant-input-shell phrase-input-shell">
-              <input
+              <textarea
                 aria-label="Message utilisateur"
                 disabled={isExtracting}
                 onChange={(event) => setInputValue(event.target.value)}
-                placeholder="Écrivez une phrase complète ou ajoutez seulement l'information manquante..."
-                type="text"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    submitFreeText(inputValue);
+                  }
+                }}
+                placeholder="Décrivez votre voyage : ville de départ, destination, date(s), nombre de passagers, type de trajet..."
+                rows={3}
                 value={inputValue}
               />
-              <button aria-label="Envoyer le message" disabled={!inputValue.trim() || isExtracting} type="submit">
-                →
-              </button>
+              <div className="input-bottom-bar">
+                <span className="input-hint">
+                  {isExtracting ? "Analyse en cours..." : "Entrée pour envoyer · Maj+Entrée pour aller à la ligne"}
+                </span>
+                <button aria-label="Envoyer le message" disabled={!inputValue.trim() || isExtracting} type="submit">
+                  {isExtracting ? "..." : "Envoyer →"}
+                </button>
+              </div>
             </div>
-            <small>
-              {isExtracting
-                ? "Analyse du message..."
-                : "Vous pouvez tout écrire en une phrase. L'assistant demandera seulement ce qui manque."}
-            </small>
 
             {!answers.type_trajet && (
               <div className="trip-choice-group inline-trip-choice" role="group" aria-label="Type de trajet">
@@ -381,19 +383,26 @@ function AssistantIA() {
         <aside className="assistant-summary-column" aria-label="Résumé dynamique du trajet">
           <section className="trip-summary-card">
             <div className="summary-title">
-              <span className="summary-clock" aria-hidden="true" />
               <h1>Résumé de votre demande</h1>
+              <span className="summary-badge">{visibleSummaryItems.length - missingFields.length}/{visibleSummaryItems.length}</span>
             </div>
-            <p>Les informations détectées se mettent à jour automatiquement à partir de vos phrases.</p>
+
+            <div className="summary-progress-track">
+              <div
+                className="summary-progress-fill"
+                style={{ width: `${Math.round(((visibleSummaryItems.length - missingFields.length) / visibleSummaryItems.length) * 100)}%` }}
+              />
+            </div>
 
             <div className="summary-list">
               {visibleSummaryItems.map((item) => {
                 const value = item.key === "type_trajet" ? formatTripType(answers[item.key]) : answers[item.key];
+                const isFilled = Boolean(value);
 
                 return (
-                  <div className="summary-row" key={item.key}>
-                    <span className="summary-icon" aria-hidden="true">
-                      {item.icon}
+                  <div className={`summary-row ${isFilled ? "summary-row--filled" : "summary-row--empty"}`} key={item.key}>
+                    <span className="summary-status-dot" aria-hidden="true">
+                      {isFilled ? "✓" : ""}
                     </span>
                     <div>
                       <strong>{item.label}</strong>

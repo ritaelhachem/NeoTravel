@@ -97,7 +97,11 @@ async function generateChatReply({ message, context, answers = {}, history = [] 
   }
 
   const missingFields = computeMissingFields(answers);
-  const currentYear = new Date().getFullYear();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const todayISO = now.toISOString().split("T")[0]; // YYYY-MM-DD
+  const tomorrowISO = new Date(now.getTime() + 86400000).toISOString().split("T")[0];
+  const dayAfterISO = new Date(now.getTime() + 2 * 86400000).toISOString().split("T")[0];
 
   const conversationHistory = Array.isArray(history)
     ? history
@@ -123,12 +127,17 @@ EXTRACTION — noms de champs EXACTS à utiliser dans "answers" :
   "type_trajet"      → exactement "aller-simple" ou "aller-retour"
   "date_retour"      → date de retour YYYY-MM-DD (si aller-retour)
 
+DATE D'AUJOURD'HUI : ${todayISO}
+- "demain" → ${tomorrowISO}
+- "après-demain" → ${dayAfterISO}
+- "dans N jours" → calcule la date à partir d'aujourd'hui
+- Pas d'année précisée → utilise ${currentYear}
+
 RÈGLES D'EXTRACTION :
 - Extrais TOUT ce qui est mentionné dans le message, même implicitement.
 - "nous serons 32", "groupe de 15", "30 au total" → nombre_passagers
 - "retour le 5", "je reviens le 20" → date_retour (déduis le mois depuis la date de départ si non précisé)
 - "chez Apple", "pour l'entreprise Renault", "je travaille chez X" → nom = X
-- Pas d'année → utilise ${currentYear}
 - "avec retour", "aller-retour", "on revient le..." → type_trajet = "aller-retour"
 - "aller simple", "sans retour" → type_trajet = "aller-simple"
 - Ne mets dans "answers" QUE les champs que tu as vraiment extraits du message.
@@ -140,10 +149,12 @@ RÈGLES DE RÉPONSE — ABSOLUES :
 - Transport TOUJOURS en autocar. Jamais d'autre service.
 - Français direct et naturel. Pas de "Parfait !", "Super !", "Excellent !".
 
-EXEMPLE :
+EXEMPLES :
 Client : "je pars de Nantes vers Paris le 19 octobre, retour le 29, nous serons 32, pour l'entreprise Apple"
-Réponse attendue :
-{"reply":"Pour finaliser votre devis, j'aurais besoin de votre adresse e-mail et d'un numéro de téléphone.","answers":{"ville_depart":"Nantes","ville_arrivee":"Paris","date_depart":"${currentYear}-10-19","date_retour":"${currentYear}-10-29","nombre_passagers":"32","type_trajet":"aller-retour","nom":"Apple"}}
+→ {"reply":"Pour finaliser votre devis, j'aurais besoin de votre adresse e-mail et d'un numéro de téléphone.","answers":{"ville_depart":"Nantes","ville_arrivee":"Paris","date_depart":"${currentYear}-10-19","date_retour":"${currentYear}-10-29","nombre_passagers":"32","type_trajet":"aller-retour","nom":"Apple"}}
+
+Client : "je veux partir demain de Lyon vers Marseille"
+→ {"reply":"Combien de passagers et quel type de trajet (aller simple ou aller-retour) ?","answers":{"ville_depart":"Lyon","ville_arrivee":"Marseille","date_depart":"${tomorrowISO}"}}
 
 FORMAT DE SORTIE : JSON pur, sans balises markdown.
 {"reply":"ta réponse","answers":{"champ":"valeur"}}`;
