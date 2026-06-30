@@ -639,8 +639,8 @@ a {
 .assistant-chat-panel {
   border-radius: 28px;
   display: grid;
-  grid-template-rows: auto minmax(460px, 1fr) auto;
-  min-height: 760px;
+  grid-template-rows: auto minmax(360px, 1fr) auto;
+  min-height: 680px;
   overflow: hidden;
 }
 
@@ -676,8 +676,9 @@ a {
 .assistant-thread {
   align-content: start;
   display: grid;
-  gap: 28px;
-  padding: 30px 30px 40px;
+  gap: 22px;
+  overflow-y: auto;
+  padding: 24px 24px 28px;
 }
 
 .assistant-message-row {
@@ -710,14 +711,14 @@ a {
 .assistant-bubble {
   background: #ffffff;
   border: 1px solid #d9dee7;
-  border-radius: 8px 28px 28px 28px;
+  border-radius: 14px 24px 24px 14px;
   box-shadow: 0 8px 18px rgba(20, 27, 39, 0.06);
   color: #252a33;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 500;
-  line-height: 1.45;
+  line-height: 1.5;
   margin: 0;
-  padding: 17px 21px;
+  padding: 14px 18px;
 }
 
 .assistant-message-row time {
@@ -730,7 +731,7 @@ a {
 
 .assistant-input-area {
   border-top: 1px solid #dfe3ea;
-  padding: 28px 30px 24px;
+  padding: 18px 24px 20px;
 }
 
 .assistant-input-shell {

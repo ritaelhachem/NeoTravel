@@ -79,6 +79,10 @@ function cleanCityName(value) {
   return capitalizeWords(city);
 }
 
+function currentYear() {
+  return new Date().getFullYear();
+}
+
 function normalizeDate(value) {
   const text = cleanValue(value).toLowerCase();
 
@@ -104,15 +108,26 @@ function normalizeDate(value) {
     return `${slashMatch[3]}-${slashMatch[2].padStart(2, "0")}-${slashMatch[1].padStart(2, "0")}`;
   }
 
-  const monthMatch = text.match(
+  // Date avec année explicite : "15 juillet 2026"
+  const monthWithYear = text.match(
     /\b(\d{1,2})\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+(20\d{2})\b/
   );
-  if (monthMatch) {
-    return `${monthMatch[3]}-${MONTHS[monthMatch[2]].padStart(2, "0")}-${monthMatch[1].padStart(2, "0")}`;
+  if (monthWithYear) {
+    return `${monthWithYear[3]}-${MONTHS[monthWithYear[2]].padStart(2, "0")}-${monthWithYear[1].padStart(2, "0")}`;
+  }
+
+  // Date sans année : "15 juillet" → on utilise l'année courante
+  const monthNoYear = text.match(
+    /\b(\d{1,2})\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\b/
+  );
+  if (monthNoYear) {
+    return `${currentYear()}-${MONTHS[monthNoYear[2]].padStart(2, "0")}-${monthNoYear[1].padStart(2, "0")}`;
   }
 
   return "";
 }
+
+const MONTH_PATTERN = "janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre";
 
 function extractDates(message) {
   const dates = [];
@@ -125,7 +140,9 @@ function extractDates(message) {
   const patterns = [
     /\b20\d{2}-\d{1,2}-\d{1,2}\b/g,
     /\b\d{1,2}[\/.-]\d{1,2}[\/.-]20\d{2}\b/g,
-    /\b\d{1,2}\s+(?:janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+20\d{2}\b/gi,
+    new RegExp(`\\b\\d{1,2}\\s+(?:${MONTH_PATTERN})\\s+20\\d{2}\\b`, "gi"),
+    // Sans année : "15 juillet", "20 août"
+    new RegExp(`\\b\\d{1,2}\\s+(?:${MONTH_PATTERN})\\b`, "gi"),
   ];
 
   patterns.forEach((pattern) => {
@@ -141,18 +158,48 @@ function extractDates(message) {
   return dates;
 }
 
+// Extrait la date de retour depuis un pattern "retour le N" quand le mois est connu via d'autres dates du message
+function extractReturnDayOnly(message, departureDates) {
+  const returnDayMatch = message.match(/(?:retour|retourne|reviens?)\s+(?:le\s+)?(\d{1,2})\b(?!\s*(?:janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre))/i);
+  if (!returnDayMatch || !departureDates.length) return "";
+
+  const day = parseInt(returnDayMatch[1], 10);
+  if (day < 1 || day > 31) return "";
+
+  // Infère le mois depuis la première date de départ trouvée
+  const refDate = departureDates[0];
+  const [year, month] = refDate.split("-");
+  return `${year}-${month}-${String(day).padStart(2, "0")}`;
+}
+
 function extractCities(message) {
+  const STOP = "\\s+(?:le|du|pour|avec|en|aller|retour|simple|demain|aujourd’hui|aujourdhui|apres|après|\\d|$)|[.,;!?]|$";
   const patterns = [
-    /\b(?:de|depuis|depart\s+de|départ\s+de)\s+([a-zà-ÿ' -]{2,}?)\s+(?:a|à|vers|pour|destination|jusqu(?:'|’)?a|jusqu(?:'|’)?à)\s+([a-zà-ÿ' -]{2,}?)(?=\s+(?:le|du|pour|avec|en|aller|retour|simple|demain|aujourd'hui|aujourdhui|apres|après|\d|$)|[.,;!?]|$)/i,
-    /\b([a-zà-ÿ' -]{2,}?)\s+(?:vers|a|à)\s+([a-zà-ÿ' -]{2,}?)(?=\s+(?:le|du|pour|avec|en|aller|retour|simple|demain|aujourd'hui|aujourdhui|apres|après|\d|$)|[.,;!?]|$)/i,
+    // "à Paris depuis Nantes", "vers Lyon de Paris", "je vais à Bordeaux depuis Lyon"
+    // group1 = arrivée, group2 = départ (swap=true)
+    // Lookbehind car "à" est un caractère accentué non reconnu comme \w par JS
+    {
+      re: new RegExp(`(?<=\\s|^|,)(?:à|a|vers)\\s+([a-zà-ÿ’ -]{2,}?)\\s+(?:depuis|de|en\\s+partant\\s+de)\\s+([a-zà-ÿ’ -]{2,}?)(?=${STOP})`, "i"),
+      swap: true,
+    },
+    // "depuis Nantes à Paris", "de Paris vers Lyon"
+    {
+      re: /\b(?:de|depuis|depart\s+de|départ\s+de)\s+([a-zà-ÿ’ -]{2,}?)\s+(?:a|à|vers|pour|destination|jusqu(?:’|’)?a|jusqu(?:’|’)?à)\s+([a-zà-ÿ’ -]{2,}?)(?=\s+(?:le|du|pour|avec|en|aller|retour|simple|demain|aujourd’hui|aujourdhui|apres|après|\d|$)|[.,;!?]|$)/i,
+      swap: false,
+    },
+    // "Nantes à Paris" (fallback générique, en dernier)
+    {
+      re: /\b([a-zà-ÿ’ -]{2,}?)\s+(?:vers|a|à)\s+([a-zà-ÿ’ -]{2,}?)(?=\s+(?:le|du|pour|avec|en|aller|retour|simple|demain|aujourd’hui|aujourdhui|apres|après|\d|$)|[.,;!?]|$)/i,
+      swap: false,
+    },
   ];
 
-  for (const pattern of patterns) {
-    const match = message.match(pattern);
+  for (const { re, swap } of patterns) {
+    const match = message.match(re);
     if (match) {
       return {
-        ville_depart: cleanCityName(match[1]),
-        ville_arrivee: cleanCityName(match[2]),
+        ville_depart: cleanCityName(swap ? match[2] : match[1]),
+        ville_arrivee: cleanCityName(swap ? match[1] : match[2]),
       };
     }
   }
@@ -160,11 +207,36 @@ function extractCities(message) {
   return {};
 }
 
+const LEGAL_FORMS = "SA|SARL|SAS|SASU|EURL|SNC|SCOP|GIE|SCI|LLC|Ltd|GmbH|Inc\\.?|NV|BV";
+
 function extractName(message) {
-  const match = message.match(
-    /\b(?:je m'appelle|je m appelle|je suis|mon nom est|nom\s*:)\s+([a-zà-ÿ' -]{2,})(?=,|\.|;|\s+(?:email|mail|tel|tél|telephone|téléphone|de|depuis|je veux|pour|$))/i
+  // 1. Nom de personne : "je m'appelle X", "mon nom est X"
+  const personMatch = message.match(
+    /\b(?:je m['']appelle|je m appelle|mon nom est|nom\s*:)\s+([a-zà-ÿ' -]{2,})(?=[,;.]|\s+(?:email|mail|t[eé]l|t[eé]l[eé]phone|de|depuis|je veux|pour|$))/i
   );
-  return match ? cleanValue(match[1]) : "";
+  if (personMatch) return cleanValue(personMatch[1]);
+
+  // 2. "je travaille chez X", "je suis chez X", "chez X"
+  const chezMatch = message.match(
+    /\b(?:je\s+(?:travaille|bosse|travaillons|bossons|suis)\s+(?:chez|pour)|chez)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 &.'-]{1,40}?)(?=[,;.!?\n]|\s+(?:et|ou|mais|je|pour|depuis|le|la|les|un|une|avec)|$)/i
+  );
+  if (chezMatch) return cleanValue(chezMatch[1]);
+
+  // 3. Nom précédé de "pour la société / l'entreprise / au nom de" etc.
+  // Capture le texte APRÈS le mot-clé jusqu'à la virgule ou fin
+  const forMatch = message.match(
+    /\b(?:(?:au nom|pour le compte)\s+d[eu']|(?:c['']est\s+)?pour\s+(?:l['']entreprise|la\s+soci[eé]t[eé]|le\s+cabinet|l['']association|la\s+mairie|l[''][eé]cole)|(?:entreprise|soci[eé]t[eé]|cabinet|association)\s*:?)\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9 &.'-]{1,50}?)(?=[,;.!?\n]|$)/i
+  );
+  if (forMatch) return cleanValue(forMatch[1]);
+
+  // 3. Nom d'entreprise autonome avec forme juridique (mots en majuscule uniquement)
+  // Ex : "Dupont & Fils SARL", "NeoTech SAS" — exclut les phrases banales en minuscule
+  const legalFormMatch = message.match(
+    new RegExp(`\\b([A-ZÀ-Ÿ][A-Za-zÀ-ÿ0-9]*(?:\\s+(?:[A-ZÀ-Ÿ][A-Za-zÀ-ÿ0-9]*|&|et))*)\\s+(?:${LEGAL_FORMS})\\b`)
+  );
+  if (legalFormMatch) return cleanValue(legalFormMatch[0]);
+
+  return "";
 }
 
 function extractPhone(message) {
@@ -212,7 +284,13 @@ function inferCurrentMissingAnswer(message, currentAnswers = {}) {
     return {};
   }
 
-  if (firstMissing === "nom" && /^[a-zà-ÿ' -]{2,}$/i.test(value)) {
+  // Nom : message court sans chiffres, sans verbes de déplacement → probablement un nom
+  if (
+    firstMissing === "nom" &&
+    value.length <= 60 &&
+    /^[a-zà-ÿ' &.-]{2,}$/i.test(value) &&
+    !/\b(?:je|je\s+vais|je\s+veux|je\s+cherche|depuis|aller|pour|avec|le|la|les|un|une|nous|bonjour)\b/i.test(value)
+  ) {
     return { nom: capitalizeWords(value) };
   }
 
@@ -276,7 +354,13 @@ function extractQuoteInfo(message, currentAnswers = {}) {
   if (passengerCount) extracted.nombre_passagers = passengerCount;
   if (tripType) extracted.type_trajet = tripType;
   if (dates[0]) extracted.date_depart = dates[0];
-  if (dates[1]) extracted.date_retour = dates[1];
+  if (dates[1]) {
+    extracted.date_retour = dates[1];
+  } else {
+    // Tente d'extraire "retour le 20" quand le mois est inférable depuis la date de départ
+    const returnDay = extractReturnDayOnly(message, dates);
+    if (returnDay) extracted.date_retour = returnDay;
+  }
 
   const answers = {
     ...currentAnswers,
