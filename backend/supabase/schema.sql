@@ -37,8 +37,18 @@ create table if not exists public.relances (
   date_creation timestamptz not null default now()
 );
 
+create table if not exists public.chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_message text not null,
+  ai_response text,
+  extracted_data jsonb,
+  context jsonb,
+  date_creation timestamptz not null default now()
+);
+
 create index if not exists clients_date_creation_idx on public.clients(date_creation desc);
 create index if not exists devis_date_creation_idx on public.devis(date_creation desc);
 create index if not exists devis_client_id_idx on public.devis(client_id);
 create index if not exists relances_client_id_idx on public.relances(client_id);
 create index if not exists relances_devis_id_idx on public.relances(devis_id);
+create index if not exists chat_messages_date_creation_idx on public.chat_messages(date_creation desc);

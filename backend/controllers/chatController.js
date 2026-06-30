@@ -16,13 +16,13 @@ async function persistChatMessage({ message, result, context }) {
     });
 
     if (error) {
-      const isMissingTable = /does not exist|schema cache|PGRST205/i.test(error.message || "");
+      const isMissingTable = /chat_messages|does not exist|schema cache|PGRST205/i.test(error.message || "");
       if (!isMissingTable) {
         console.warn("Supabase chat storage unavailable:", error.message);
       }
     }
   } catch (storageError) {
-    const isMissingTable = /does not exist|schema cache|PGRST205/i.test(storageError.message || "");
+    const isMissingTable = /chat_messages|does not exist|schema cache|PGRST205/i.test(storageError.message || "");
     if (!isMissingTable) {
       console.warn("Supabase chat storage unavailable:", storageError.message);
     }
